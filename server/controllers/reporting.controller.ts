@@ -3,8 +3,10 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
-import { startOfYear, endOfDay, startOfDay, format } from 'date-fns';
-import { id } from 'date-fns/locale';
+import { startOfYear, endOfDay } from 'date-fns';
+import { ReportingService } from '../services/reporting.service';
+import { ReminderService } from '../services/reminder.service';
+import { cacheService } from '../services/cache.service';
 
 // --- HELPER TYPES & FUNCTIONS ---
 
@@ -105,6 +107,15 @@ export const getBalanceSheet = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
 
         const end = endDate ? String(endDate) : new Date().toISOString();
+
+        // 0. Cache Check
+        const cacheKey = `report:bs:${perusahaanId}:${end.slice(0, 10)}`;
+        const cached = await cacheService.get(cacheKey);
+        if (cached) {
+            res.setHeader('X-Cache', 'HIT');
+            return res.json(cached);
+        }
+
         const startOfCurrentYear = startOfYear(new Date(end)).toISOString();
 
         // 1. Get Components
@@ -129,7 +140,7 @@ export const getBalanceSheet = async (req: Request, res: Response) => {
         // Usually shown as a separate line item "Laba Tahun Berjalan"
         totalEquity += currentEarnings;
 
-        res.json({
+        const result = {
             assets,
             liabilities,
             equity,
@@ -140,7 +151,13 @@ export const getBalanceSheet = async (req: Request, res: Response) => {
                 totalEquity,
                 balanceCheck: totalAssets - (totalLiabilities + totalEquity) // Should be 0
             }
-        });
+        };
+
+        // Cache Result (15 mins)
+        await cacheService.set(cacheKey, result, 900);
+        res.setHeader('X-Cache', 'MISS');
+
+        res.json(result);
 
     } catch (error) {
         console.error('Balance Sheet Error:', error);
@@ -156,6 +173,14 @@ export const getIncomeStatement = async (req: Request, res: Response) => {
 
         const start = startDate ? new Date(String(startDate)) : startOfYear(new Date());
         const end = endDate ? endOfDay(new Date(String(endDate))) : endOfDay(new Date());
+
+        // 0. Cache Check
+        const cacheKey = `report:is:${perusahaanId}:${start.toISOString().slice(0, 10)}:${end.toISOString().slice(0, 10)}`;
+        const cached = await cacheService.get(cacheKey);
+        if (cached) {
+            res.setHeader('X-Cache', 'HIT');
+            return res.json(cached);
+        }
 
         // Get journals specifically for this period
         const revenueAccounts = await prisma.chartOfAccounts.findMany({
@@ -201,7 +226,7 @@ export const getIncomeStatement = async (req: Request, res: Response) => {
         const totalRevenue = activeRevenues.reduce((s, r) => s + r.saldo, 0);
         const totalExpense = activeExpenses.reduce((s, e) => s + e.saldo, 0);
 
-        res.json({
+        const result = {
             revenue: activeRevenues,
             expense: activeExpenses,
             summary: {
@@ -210,7 +235,11 @@ export const getIncomeStatement = async (req: Request, res: Response) => {
                 netIncome: totalRevenue - totalExpense
             },
             period: { start, end }
-        });
+        };
+
+        await cacheService.set(cacheKey, result, 900);
+        res.setHeader('X-Cache', 'MISS');
+        res.json(result);
 
     } catch (error) {
         console.error('Income Statement Error:', error);
@@ -239,7 +268,6 @@ export const getCashFlow = async (req: Request, res: Response) => {
 export const exportReport = async (req: Request, res: Response) => {
     try {
         const { type, format: fileFormat, data } = req.body;
-        // Data is passed from frontend to avoid re-calculation or complex query params parsing
         // In a strict environment, we should recalculate here. For simplicity/speed, we trust the payload or fetch again.
         // Let's assume we re-fetch to ensure security/data integrity, but that requires mapping all params again.
         // For this prototype, let's generate based on 'type' and query params forwarded.
@@ -288,4 +316,38 @@ export const exportReport = async (req: Request, res: Response) => {
     } catch (error) {
         res.status(500).json({ message: 'Export failed' });
     }
-}
+};
+
+export const getARAging = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const report = await ReportingService.calculateARAging(perusahaanId);
+        res.json(report);
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal mengambil aging piutang' });
+    }
+};
+
+export const getAPAging = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const report = await ReportingService.calculateAPAging(perusahaanId);
+        res.json(report);
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal mengambil aging hutang' });
+    }
+};
+
+export const triggerReminders = async (req: Request, res: Response) => {
+    try {
+        const results = await ReminderService.processReminders();
+        res.json({
+            message: 'Reminder processing complete',
+            results
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal memproses pengingat pembayaran' });
+    }
+};

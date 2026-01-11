@@ -40,6 +40,7 @@ export const createTransactionSchema = z.object({
     pelangganId: z.string().optional(),
     pemasokId: z.string().optional(),
     cabangId: z.string().optional(),
+    lampiran: z.string().optional(),
     items: z.array(transactionLineSchema).min(2, 'Transaksi minimal harus memiliki 2 baris (Debit & Kredit)'),
 }).refine((data) => {
     const totalDebit = data.items.reduce((sum, item) => sum + item.debit, 0);

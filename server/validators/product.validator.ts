@@ -20,6 +20,12 @@ export const createProductSchema = z.object({
     stokMinimum: z.coerce.number().min(0).default(0),
     stokMaksimum: z.coerce.number().min(0).optional(),
 
+    // Account Mapping
+    akunPersediaanId: z.string().optional(),
+    akunHppId: z.string().optional(),
+    akunPenjualanId: z.string().optional(),
+    akunReturPenjualanId: z.string().optional(),
+
     // Variants (Optional initial creation)
     variants: z.array(z.object({
         namaVariant: z.string().min(1),

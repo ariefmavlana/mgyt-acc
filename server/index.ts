@@ -20,6 +20,11 @@ import productRoutes from './routes/product.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import reportingRoutes from './routes/reporting.routes';
 import onboardingRoutes from './routes/onboarding.routes';
+import templateRoutes from './routes/template.routes';
+import periodRoutes from './routes/period.routes';
+import importRoutes from './routes/import.routes';
+import purchaseRoutes from './routes/purchase.routes';
+import hrRoutes from './routes/hr.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
 import { protect } from './middleware/auth.middleware';
 
@@ -120,6 +125,11 @@ nextApp.prepare().then(() => {
     app.use('/api/products', protect, tenantMiddleware, productRoutes);
     app.use('/api/inventory', protect, tenantMiddleware, inventoryRoutes);
     app.use('/api/reports', protect, tenantMiddleware, reportingRoutes);
+    app.use('/api/templates', protect, tenantMiddleware, templateRoutes);
+    app.use('/api/periods', protect, tenantMiddleware, periodRoutes);
+    app.use('/api/import', protect, tenantMiddleware, importRoutes);
+    app.use('/api/purchases', protect, tenantMiddleware, purchaseRoutes);
+    app.use('/api/hr', protect, tenantMiddleware, hrRoutes);
 
     // Health Check
     app.get('/api/health', (req: Request, res: Response) => {

@@ -2,8 +2,17 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
 import { createInvoiceSchema } from '../validators/invoice.validator';
-import { addDays, differenceInDays } from 'date-fns';
+import { addDays, differenceInDays, format } from 'date-fns';
+import { id as idLocale } from 'date-fns/locale';
 import PDFDocument from 'pdfkit';
+import { InventoryService } from '../services/inventory.service';
+
+interface JournalItem {
+    akunId: string;
+    deskripsi: string;
+    debit: number;
+    kredit: number;
+}
 
 export const createInvoice = async (req: Request, res: Response) => {
     try {
@@ -58,6 +67,67 @@ export const createInvoice = async (req: Request, res: Response) => {
                     subtotal: amount,
                 };
             });
+
+            // 4a. Inventory & COGS Processing
+            const inventoryJournalDetails: JournalItem[] = [];
+            // Fix: Gudang relates to Cabang, use nested query for perusahaanId
+            const warehouseId = validatedData.gudangId || (await tx.gudang.findFirst({
+                where: { cabang: { perusahaanId }, isUtama: true }
+            }))?.id;
+
+            if (validatedData.items.some(i => i.produkId) && !warehouseId) {
+                // Try to find any warehouse if strict branch check fails or if not set
+                const anyWarehouse = await tx.gudang.findFirst({
+                    where: { cabang: { perusahaanId } }
+                });
+                if (!anyWarehouse) throw new Error("Gudang tidak ditemukan. Harap buat gudang terlebih dahulu.");
+                // We really should enforce warehouse selection, but for now fallback
+            }
+
+            for (const item of validatedData.items) {
+                if (item.produkId) {
+                    const product = await tx.produk.findUnique({
+                        where: { id: item.produkId },
+                        include: { persediaan: true }
+                    });
+
+                    if (!product || !product.persediaanId) {
+                        throw new Error(`Produk tidak valid untuk item: ${item.deskripsi}`);
+                    }
+
+                    // Deduct Stock (FIFO)
+                    // We need a specific warehouse. If not provided, usage of default/main.
+                    const activeGudang = warehouseId!;
+
+                    const cogs = await InventoryService.removeStock(tx as any, {
+                        persediaanId: product.persediaanId,
+                        gudangId: activeGudang,
+                        qty: item.kuantitas,
+                        refType: 'SALES',
+                        refId: invNo, // Use Invoice Number as temp ref, or we can use Transaksi ID later if we move this after creation
+                        tanggal,
+                        keterangan: `Penjualan Invoice ${invNo}`
+                    });
+
+                    // Prepare COGS Journal Legs
+                    if (product.persediaan?.akunHppId && product.persediaan?.akunPersediaanId) {
+                        // DB: COGS (Expense)
+                        inventoryJournalDetails.push({
+                            akunId: product.persediaan.akunHppId,
+                            deskripsi: `HPP - ${item.deskripsi}`,
+                            debit: cogs,
+                            kredit: 0
+                        });
+                        // CR: Inventory (Asset)
+                        inventoryJournalDetails.push({
+                            akunId: product.persediaan.akunPersediaanId,
+                            deskripsi: `Persediaan - ${item.deskripsi}`,
+                            debit: 0,
+                            kredit: cogs
+                        });
+                    }
+                }
+            }
 
             const total = subtotal;
 
@@ -199,6 +269,14 @@ export const createInvoice = async (req: Request, res: Response) => {
                                 debit: 0,
                                 kredit: item.subtotal,
                                 saldoSesudah: 0
+                            })),
+                            ...inventoryJournalDetails.map((item, i) => ({
+                                urutan: detailItems.length + 2 + i,
+                                akunId: item.akunId,
+                                deskripsi: item.deskripsi,
+                                debit: item.debit,
+                                kredit: item.kredit,
+                                saldoSesudah: 0
                             }))
                         ]
                     }
@@ -214,8 +292,23 @@ export const createInvoice = async (req: Request, res: Response) => {
             for (const item of detailItems) {
                 await tx.chartOfAccounts.update({
                     where: { id: item.akunId },
-                    data: { saldoBerjalan: { decrement: item.subtotal } }
+                    data: { saldoBerjalan: { decrement: item.subtotal } } // Revenue (Credit)
                 });
+            }
+
+            // Update COGS and Inventory Accounts
+            for (const item of inventoryJournalDetails) {
+                if (item.debit > 0) {
+                    await tx.chartOfAccounts.update({
+                        where: { id: item.akunId },
+                        data: { saldoBerjalan: { increment: item.debit } } // Expense (Debit)
+                    });
+                } else {
+                    await tx.chartOfAccounts.update({
+                        where: { id: item.akunId },
+                        data: { saldoBerjalan: { decrement: item.kredit } } // Asset Decrease (Credit)
+                    });
+                }
             }
 
             return transaksi;
@@ -279,6 +372,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         });
 
     } catch (error) {
+        console.error('Get Invoices Error:', error);
         res.status(500).json({ message: 'Gagal mengambil data invoice' });
     }
 };
@@ -307,6 +401,7 @@ export const getInvoiceDetail = async (req: Request, res: Response) => {
 
         res.json(invoice);
     } catch (error) {
+        console.error('Get Invoice Detail Error:', error);
         res.status(500).json({ message: 'Gagal mengambil detail invoice' });
     }
 };
@@ -329,62 +424,124 @@ export const generateInvoicePDF = async (req: Request, res: Response) => {
 
         if (!invoice) return res.status(404).json({ message: 'Invoice tidak ditemukan' });
 
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${invoice.nomorTransaksi.replace(/\//g, '-')}.pdf`);
 
         doc.pipe(res);
 
-        // --- HEADER ---
-        doc.fontSize(20).text(invoice.perusahaan.nama, { align: 'right' });
-        doc.fontSize(10).text(invoice.perusahaan.alamat || '', { align: 'right' });
-        doc.moveDown();
+        // --- COLORS & STYLES ---
+        const primaryColor = '#1e293b';
+        const secondaryColor = '#64748b';
+        const accentColor = '#3b82f6';
+        const borderColor = '#e2e8f0';
 
-        doc.fontSize(20).text('INVOICE', 50, 50);
-        doc.fontSize(10).text(`Nomor: ${invoice.nomorTransaksi}`, 50, 80);
-        doc.text(`Tanggal: ${invoice.tanggal.toLocaleDateString('id-ID')}`, 50, 95);
-        doc.text(`Jatuh Tempo: ${invoice.tanggalJatuhTempo?.toLocaleDateString('id-ID') || '-'}`, 50, 110);
+        // --- HEADER / LETTERHEAD ---
+        if (invoice.perusahaan.logoUrl) {
+            // If we had a local path for logo
+            // doc.image(path.join(process.cwd(), 'public', invoice.perusahaan.logoUrl), 50, 45, { width: 50 });
+        }
+
+        doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text(invoice.perusahaan.nama, 200, 50, { align: 'right' });
+        doc.fillColor(secondaryColor).fontSize(10).font('Helvetica').text(invoice.perusahaan.alamat || '', 200, 75, { align: 'right' });
+        doc.text(`Telp: ${invoice.perusahaan.telepon || '-'} | Email: ${invoice.perusahaan.email || '-'}`, 200, 90, { align: 'right' });
+
+        doc.rect(50, 110, 500, 2).fill(accentColor);
+        doc.moveDown(2);
+
+        // --- INVOICE INFO ---
+        const infoY = 130;
+        doc.fillColor(primaryColor).fontSize(24).font('Helvetica-Bold').text('INVOICE', 50, infoY);
+
+        doc.fontSize(10).font('Helvetica-Bold').text('Nomor:', 50, infoY + 35);
+        doc.font('Helvetica').text(invoice.nomorTransaksi, 120, infoY + 35);
+
+        doc.font('Helvetica-Bold').text('Tanggal:', 50, infoY + 50);
+        // Fix: Use imported idLocale
+        doc.font('Helvetica').text(format(new Date(invoice.tanggal), 'dd MMMM yyyy', { locale: idLocale }), 120, infoY + 50);
+
+        doc.font('Helvetica-Bold').text('Jatuh Tempo:', 50, infoY + 65);
+        doc.fillColor('#ef4444').font('Helvetica-Bold').text(invoice.tanggalJatuhTempo ? format(new Date(invoice.tanggalJatuhTempo), 'dd MMMM yyyy', { locale: idLocale }) : '-', 120, infoY + 65);
 
         // --- BILL TO ---
-        doc.moveDown();
-        doc.fontSize(12).text('Ditagihkan Kepada:', 50, 150);
-        doc.fontSize(10).font('Helvetica-Bold').text(invoice.pelanggan?.nama || 'Umum');
-        if (invoice.pelanggan?.alamat) doc.font('Helvetica').text(invoice.pelanggan.alamat);
-        if (invoice.pelanggan?.email) doc.text(invoice.pelanggan.email);
+        const billToY = 130;
+        doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold').text('Ditagihkan Kepada:', 350, billToY + 35);
+        doc.fontSize(12).text(invoice.pelanggan?.nama || 'Pelanggan Umum', 350, billToY + 50);
+        doc.fontSize(10).font('Helvetica').fillColor(secondaryColor).text(invoice.pelanggan?.alamat || '', 350, billToY + 65, { width: 200 });
+        doc.text(invoice.pelanggan?.email || '', 350, doc.y);
 
         // --- TABLE HEADER ---
-        let y = 250;
-        doc.font('Helvetica-Bold');
-        doc.text('Deskripsi', 50, y);
-        doc.text('Qty', 300, y, { width: 50, align: 'center' });
-        doc.text('Harga', 350, y, { width: 90, align: 'right' });
-        doc.text('Total', 440, y, { width: 100, align: 'right' });
+        let tableY = 250;
+        doc.rect(50, tableY, 500, 20).fill(primaryColor);
+        doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10);
+        doc.text('DISKREPSI', 60, tableY + 5);
+        doc.text('QTY', 300, tableY + 5, { width: 50, align: 'center' });
+        doc.text('HARGA', 350, tableY + 5, { width: 90, align: 'right' });
+        doc.text('TOTAL', 440, tableY + 5, { width: 100, align: 'right' });
 
-        doc.moveTo(50, y + 15).lineTo(550, y + 15).stroke();
-        y += 25;
-        doc.font('Helvetica');
+        tableY += 25;
+        doc.fillColor(primaryColor).font('Helvetica');
 
         // --- ITEMS ---
-        invoice.detail.forEach((item: any) => {
-            doc.text(item.deskripsi || item.akun.namaAkun, 50, y);
-            doc.text(Number(item.kuantitas).toString(), 300, y, { width: 50, align: 'center' });
-            doc.text(new Intl.NumberFormat('id-ID').format(Number(item.hargaSatuan)), 350, y, { width: 90, align: 'right' });
-            doc.text(new Intl.NumberFormat('id-ID').format(Number(item.subtotal)), 440, y, { width: 100, align: 'right' });
-            y += 20;
+        invoice.detail.forEach((item: any, index: number) => {
+            if (tableY > 700) {
+                doc.addPage();
+                tableY = 50;
+            }
+
+            // Alternating row background
+            if (index % 2 !== 0) {
+                doc.rect(50, tableY - 2, 500, 18).fill('#f8fafc');
+                doc.fillColor(primaryColor);
+            }
+
+            doc.text(item.deskripsi || item.akun.namaAkun, 60, tableY);
+            doc.text(Number(item.kuantitas).toString(), 300, tableY, { width: 50, align: 'center' });
+            doc.text(new Intl.NumberFormat('id-ID').format(Number(item.hargaSatuan)), 350, tableY, { width: 90, align: 'right' });
+            doc.text(new Intl.NumberFormat('id-ID').format(Number(item.subtotal)), 440, tableY, { width: 100, align: 'right' });
+
+            doc.moveTo(50, tableY + 14).lineTo(550, tableY + 14).strokeColor(borderColor).lineWidth(0.5).stroke();
+            tableY += 20;
         });
 
-        doc.moveTo(50, y).lineTo(550, y).stroke();
-        y += 10;
+        // --- SUMMARY ---
+        if (tableY > 600) {
+            doc.addPage();
+            tableY = 50;
+        }
 
-        // --- TOTALS ---
+        const summaryY = tableY + 10;
         doc.font('Helvetica-Bold');
-        doc.text('Total', 350, y, { width: 90, align: 'right' });
-        doc.text(`Rp ${new Intl.NumberFormat('id-ID').format(Number(invoice.total))}`, 440, y, { width: 100, align: 'right' });
+        doc.text('Subtotal', 350, summaryY, { width: 90, align: 'right' });
+        doc.text(`Rp ${new Intl.NumberFormat('id-ID').format(Number(invoice.subtotal))}`, 440, summaryY, { width: 100, align: 'right' });
+
+        doc.text('Pajak (0%)', 350, summaryY + 15, { width: 90, align: 'right' });
+        doc.text('Rp 0', 440, summaryY + 15, { width: 100, align: 'right' });
+
+        doc.rect(350, summaryY + 32, 200, 25).fill(accentColor);
+        doc.fillColor('#ffffff').fontSize(12).text('TOTAL', 350, summaryY + 38, { width: 90, align: 'right' });
+        doc.text(`Rp ${new Intl.NumberFormat('id-ID').format(Number(invoice.total))}`, 440, summaryY + 38, { width: 100, align: 'right' });
+
+        // --- PAYMENT TERMS ---
+        doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold').text('Informasi Pembayaran:', 50, summaryY + 10);
+        doc.font('Helvetica').fillColor(secondaryColor).text('Silakan transfer ke rekening berikut:');
+        doc.text('Bank BCA: 1234567890 a/n PT MAVA');
+        doc.moveDown();
+        doc.text('Harap sertakan nomor invoice pada berita transfer.');
 
         // --- FOOTER ---
-        doc.font('Helvetica').fontSize(10);
-        doc.text('Terima kasih atas kepercayaan Anda.', 50, 700, { align: 'center', width: 500 });
+        const pages = doc.bufferedPageRange();
+        for (let i = 0; i < pages.count; i++) {
+            doc.switchToPage(i);
+            doc.fillColor(secondaryColor).fontSize(8);
+            doc.text(
+                `Halaman ${i + 1} dari ${pages.count} | Dicetak pada ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
+                50,
+                780,
+                { align: 'center', width: 500 }
+            );
+        }
 
         doc.end();
 

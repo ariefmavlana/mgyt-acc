@@ -149,8 +149,10 @@ model Transaksi {
     @@index([pelangganId])
     @@index([pemasokId])
     @@index([statusPembayaran])
+    @@index([perusahaanId, statusPembayaran]) // Optimization for Invoice List by Status
     @@index([referensi])
     @@index([tanggalJatuhTempo])
+    @@index([perusahaanId, tipe, createdAt]) // Opt for recent invoices
 }
 
 model TransaksiDetail {
@@ -374,6 +376,7 @@ model JurnalDetail {
     @@index([jurnalId])
     @@index([akunId])
     @@index([debit, kredit])
+    @@index([akunId, jurnalId]) // Optimization for Ledger queries joining Jurnal
 }
 
 // ============================================================================
@@ -412,3 +415,8 @@ model PeriodeAkuntansi {
 // ============================================================================
 // ASSETS MANAGEMENT
 // ============================================================================
+
+model AssetFixed {
+    id String @id @default(cuid())
+    // Placeholder for future Asset module
+}

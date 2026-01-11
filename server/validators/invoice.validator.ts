@@ -8,12 +8,14 @@ export const createInvoiceSchema = z.object({
     terminPembayaran: z.number().min(0).default(30), // Days
     tanggalJatuhTempo: z.string().or(z.date()).optional(), // Override if needed
     referensi: z.string().optional(),
+    gudangId: z.string().optional(), // Warehouse selector
     catatan: z.string().optional(),
     mataUangId: z.string().optional(), // Defaults to IDR
     kurs: z.number().optional(), // Defaults to 1
 
     // Line items
     items: z.array(transactionLineSchema.omit({ kredit: true, debit: true }).extend({
+        produkId: z.string().optional(), // Link to Product
         kuantitas: z.number().min(1).default(1),
         hargaSatuan: z.number().min(0),
         diskon: z.number().min(0).optional().default(0),

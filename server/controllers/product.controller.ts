@@ -102,7 +102,13 @@ export const createProduct = async (req: Request, res: Response) => {
                     stokMaksimum: validatedData.stokMaksimum,
                     isPajakPPN: validatedData.isPPN,
                     fotoProduk: validatedData.fotoUtama,
-                    deskripsi: validatedData.deskripsiSingkat
+                    deskripsi: validatedData.deskripsiSingkat,
+
+                    // Account Mapping
+                    akunPersediaanId: validatedData.akunPersediaanId,
+                    akunHppId: validatedData.akunHppId,
+                    akunPenjualanId: validatedData.akunPenjualanId,
+                    akunReturPenjualanId: validatedData.akunReturPenjualanId
                 }
             });
 
@@ -164,7 +170,13 @@ export const updateProduct = async (req: Request, res: Response) => {
                 data: {
                     namaPersediaan: validatedData.namaProduk,
                     hargaJual: validatedData.hargaJualEceran,
-                    hargaBeli: validatedData.hargaBeli
+                    hargaBeli: validatedData.hargaBeli,
+
+                    // Account Mapping (if provided)
+                    ...(validatedData.akunPersediaanId && { akunPersediaanId: validatedData.akunPersediaanId }),
+                    ...(validatedData.akunHppId && { akunHppId: validatedData.akunHppId }),
+                    ...(validatedData.akunPenjualanId && { akunPenjualanId: validatedData.akunPenjualanId }),
+                    ...(validatedData.akunReturPenjualanId && { akunReturPenjualanId: validatedData.akunReturPenjualanId })
                 }
             });
         }

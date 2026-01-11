@@ -26,8 +26,9 @@ model Gudang {
     stokPersediaan   StokPersediaan[]
     mutasiPersediaan MutasiPersediaan[]
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @updatedAt
+    inventoryLayers InventoryLayer[]
 
     @@unique([cabangId, kode])
     @@index([cabangId])
@@ -74,9 +75,42 @@ model Persediaan {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
+    // ACCOUNT MAPPING (GL Accounts)
+    akunPersediaanId     String? // Asset Account
+    akunHppId            String? // COGS Account
+    akunPenjualanId      String? // Sales Account
+    akunReturPenjualanId String? // Sales Return Account
+
+    inventoryLayers InventoryLayer[]
+
     @@unique([perusahaanId, kodePersediaan])
     @@index([perusahaanId, kategori])
     @@index([barcode])
+}
+
+model InventoryLayer {
+    id           String     @id @default(cuid())
+    persediaan   Persediaan @relation(fields: [persediaanId], references: [id])
+    persediaanId String
+
+    gudang   Gudang @relation(fields: [gudangId], references: [id])
+    gudangId String
+
+    batchNo      String?
+    tanggalMasuk DateTime @default(now())
+
+    kuantitasAwal Decimal @db.Decimal(18, 4)
+    kuantitasSisa Decimal @db.Decimal(18, 4)
+    hargaBeli     Decimal @db.Decimal(18, 2) // Unit Cost
+
+    referensiType String? // "PURCHASE", "OPENING_BALANCE", "ADJUSTMENT"
+    referensiId   String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([persediaanId, gudangId])
+    @@index([kuantitasSisa])
 }
 
 model StokPersediaan {

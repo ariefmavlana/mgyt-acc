@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getTransactions, createTransaction, getAccounts, voidTransaction } from '../controllers/transaction.controller';
+import { getTransactions, createTransaction, getAccounts, voidTransaction, duplicateTransaction } from '../controllers/transaction.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -10,6 +10,7 @@ router.use(protect);
 router.get('/', getTransactions);
 router.post('/', createTransaction);
 router.get('/accounts', getAccounts);
+router.get('/:id/duplicate', duplicateTransaction);
 router.delete('/:id/void', voidTransaction);
 
 export default router;

@@ -1,54 +1,34 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { TransactionTable } from '@/components/transactions/transaction-table';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Search, Filter, Download, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useCompany } from '@/hooks/use-company';
-import api from '@/lib/api';
 import { Input } from '@/components/ui/input';
+import { useTransactions } from '@/hooks/use-transactions';
+import { useDebounce } from '@/hooks/use-debounce';
 
-interface Transaction {
-    id: string;
-    nomorTransaksi: string;
-    deskripsi: string;
-    tanggal: string;
-    tipe: string;
-    total: number;
-    statusPembayaran: string;
-    isVoid: boolean;
-}
+const TransactionTable = React.lazy(() =>
+    import('@/components/transactions/transaction-table').then(mod => ({ default: mod.TransactionTable }))
+);
 
 export default function TransactionsPage() {
-    const { currentCompany } = useCompany();
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearch = useDebounce(searchTerm, 500);
 
-    const fetchTransactions = React.useCallback(async () => {
-        if (!currentCompany) return;
-        try {
-            setLoading(true);
-            const res = await api.get('/transactions', {
-                params: { perusahaanId: currentCompany.id }
-            });
-            setTransactions(res.data.transactions);
-        } catch (error) {
-            console.error('Failed to fetch transactions:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentCompany]);
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+        isError
+    } = useTransactions({
+        limit: 20,
+        search: debouncedSearch
+    });
 
-    useEffect(() => {
-        fetchTransactions();
-    }, [fetchTransactions]);
-
-    const filteredTransactions = transactions.filter((t) =>
-        t.deskripsi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.nomorTransaksi.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const allTransactions = data?.pages.flatMap((page) => page.transactions) || [];
 
     return (
         <div className="p-8 space-y-8 animate-in fade-in duration-500">
@@ -94,13 +74,40 @@ export default function TransactionsPage() {
             </div>
 
             {/* Data section */}
-            {loading ? (
+            {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-32 space-y-4">
                     <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                    <p className="text-slate-500 font-medium">Memproses data...</p>
+                    <p className="text-slate-500 font-medium">Memuat data...</p>
+                </div>
+            ) : isError ? (
+                <div className="text-center py-10 text-red-500">
+                    Gagal memuat transaksi. Silakan coba lagi.
                 </div>
             ) : (
-                <TransactionTable transactions={filteredTransactions} />
+                <>
+                    <React.Suspense fallback={<div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div>}>
+                        <TransactionTable transactions={allTransactions} />
+                    </React.Suspense>
+
+                    {/* Infinite Scroll Trigger */}
+                    {hasNextPage && (
+                        <div className="flex justify-center mt-6">
+                            <Button
+                                variant="outline"
+                                onClick={() => fetchNextPage()}
+                                disabled={isFetchingNextPage}
+                            >
+                                {isFetchingNextPage ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat lainnya...
+                                    </>
+                                ) : (
+                                    'Muat Lebih Banyak'
+                                )}
+                            </Button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
