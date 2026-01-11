@@ -100,12 +100,12 @@ export function CompanyTable({ data, onDelete }: CompanyTableProps) {
                             <DropdownMenuLabel>Aksi</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => router.push(`/companies/${company.id}`)}>
                                 <Settings className="mr-2 h-4 w-4" />
-                                <span>Pengaturan</span>
+                                <span className="ml-2">Pengaturan</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50" onClick={() => onDelete?.(company.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Hapus</span>
+                                <span className="ml-2">Hapus</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

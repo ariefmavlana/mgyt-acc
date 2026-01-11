@@ -14,7 +14,8 @@ import {
     LogOut,
     Menu,
     X,
-    ChevronRight
+    ChevronRight,
+    FolderTree
 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -31,6 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const menuItems = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Perusahaan', href: '/dashboard/companies', icon: Building2 },
+        { name: 'Buku Besar', href: '/dashboard/coa', icon: FolderTree },
         { name: 'Transaksi', href: '/dashboard/transactions', icon: FileText },
         { name: 'Laporan', href: '/dashboard/reports', icon: FileText },
         { name: 'Pengaturan', href: '/dashboard/settings', icon: Settings },
@@ -58,7 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                     {isSidebarOpen && (
                         <span className="ml-3 font-bold text-slate-800 tracking-tight transition-opacity duration-300">
-                            Mavlana ACC
+                            MGYT Accounting
                         </span>
                     )}
                 </div>

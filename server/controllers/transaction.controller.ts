@@ -1,34 +1,42 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
 import { createTransactionSchema } from '../validators/transaction.validator';
+import { Prisma } from '@prisma/client';
 
-export const getTransactions = async (req: AuthRequest, res: Response) => {
+export const getTransactions = async (req: Request, res: Response) => {
     try {
-        const { perusahaanId } = req.query;
-        if (!perusahaanId) {
-            return res.status(400).json({ message: 'Perusahaan ID diperlukan' });
-        }
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.user.perusahaanId;
 
         const page = parseInt((req.query.page as string) || '1');
         const limit = parseInt((req.query.limit as string) || '10');
         const skip = (page - 1) * limit;
 
-        const { startDate, endDate, type } = req.query;
+        const startDate = req.query.startDate as string | undefined;
+        const endDate = req.query.endDate as string | undefined;
+        const type = req.query.type as string | undefined;
 
-        const where: Record<string, unknown> = {
-            perusahaanId: String(perusahaanId),
+        const where: Prisma.TransaksiWhereInput = {
+            perusahaanId: perusahaanId,
         };
 
-        if (startDate && endDate) {
-            where.tanggal = {
-                gte: new Date(startDate as string),
-                lte: new Date(endDate as string),
-            };
+        if (startDate && startDate !== 'undefined') {
+            const start = new Date(startDate);
+            if (!isNaN(start.getTime())) {
+                where.tanggal = { ...(where.tanggal as object), gte: start };
+            }
         }
 
-        if (type) {
-            where.tipe = type;
+        if (endDate && endDate !== 'undefined') {
+            const end = new Date(endDate);
+            if (!isNaN(end.getTime())) {
+                where.tanggal = { ...(where.tanggal as object), lte: end };
+            }
+        }
+
+        if (type && type !== 'undefined') {
+            where.tipe = type as Prisma.EnumTipeTransaksiFilter;
         }
 
         const [transactions, total] = await Promise.all([
@@ -60,14 +68,11 @@ export const getTransactions = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const createTransaction = async (req: AuthRequest, res: Response) => {
+export const createTransaction = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const validatedData = createTransactionSchema.parse(req.body);
-        const { perusahaanId } = req.query;
-
-        if (!perusahaanId) {
-            return res.status(400).json({ message: 'Perusahaan ID diperlukan' });
-        }
+        const perusahaanId = authReq.user.perusahaanId;
 
         const result = await prisma.$transaction(async (tx) => {
             // 1. Find or create active period
@@ -77,7 +82,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
 
             let period = await tx.periodeAkuntansi.findFirst({
                 where: {
-                    perusahaanId: String(perusahaanId),
+                    perusahaanId,
                     bulan: month,
                     tahun: year,
                     status: 'TERBUKA'
@@ -89,7 +94,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
                 // In strict systems, this should error. Let's create it for now to be user-friendly.
                 period = await tx.periodeAkuntansi.create({
                     data: {
-                        perusahaanId: String(perusahaanId),
+                        perusahaanId,
                         bulan: month,
                         tahun: year,
                         nama: `${month}-${year}`,
@@ -107,8 +112,8 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
 
             const transaksi = await tx.transaksi.create({
                 data: {
-                    perusahaanId: String(perusahaanId),
-                    penggunaId: req.user.id,
+                    perusahaanId,
+                    penggunaId: authReq.user.id,
                     nomorTransaksi: transNo,
                     tanggal: date,
                     tipe: validatedData.tipe as 'PENJUALAN' | 'PEMBELIAN' | 'JURNAL_UMUM',
@@ -118,7 +123,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
                     statusPembayaran: 'LUNAS', // Default to LUNAS for simple journal entries
                     isPosted: true,
                     postedAt: new Date(),
-                    postedBy: req.user.username,
+                    postedBy: authReq.user.username,
                     detail: {
                         create: validatedData.items.map((item, index) => ({
                             urutan: index + 1,
@@ -135,7 +140,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             // 3. Create Voucher
             const voucher = await tx.voucher.create({
                 data: {
-                    perusahaanId: String(perusahaanId),
+                    perusahaanId,
                     transaksiId: transaksi.id,
                     nomorVoucher: `VCH-${transNo}`,
                     tanggal: date,
@@ -144,10 +149,10 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
                     totalDebit: totalAmount,
                     totalKredit: totalAmount,
                     status: 'DIPOSTING',
-                    dibuatOlehId: req.user.id,
+                    dibuatOlehId: authReq.user.id,
                     isPosted: true,
                     postedAt: new Date(),
-                    postedBy: req.user.username,
+                    postedBy: authReq.user.username,
                     detail: {
                         create: validatedData.items.map((item, index) => ({
                             urutan: index + 1,
@@ -163,7 +168,7 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
             // 4. Create Jurnal Umum
             await tx.jurnalUmum.create({
                 data: {
-                    perusahaanId: String(perusahaanId),
+                    perusahaanId,
                     periodeId: period.id,
                     voucherId: voucher.id,
                     nomorJurnal: `GL-${transNo}`,
@@ -218,22 +223,21 @@ export const createTransaction = async (req: AuthRequest, res: Response) => {
         console.error(error);
         if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'ZodError') {
             const zodError = error as unknown as { errors: Array<{ message: string }> };
-            return res.status(400).json({ message: zodError.errors[0].message, errors: zodError.errors });
+            const errorMessage = zodError.errors?.[0]?.message || 'Validasi gagal';
+            return res.status(400).json({ message: errorMessage, errors: zodError.errors });
         }
         res.status(500).json({ message: 'Gagal membuat transaksi' });
     }
 };
 
-export const getAccounts = async (req: AuthRequest, res: Response) => {
+export const getAccounts = async (req: Request, res: Response) => {
     try {
-        const { perusahaanId } = req.query;
-        if (!perusahaanId) {
-            return res.status(400).json({ message: 'Perusahaan ID diperlukan' });
-        }
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.user.perusahaanId;
 
         const accounts = await prisma.chartOfAccounts.findMany({
             where: {
-                perusahaanId: String(perusahaanId),
+                perusahaanId,
                 isActive: true,
             },
             orderBy: { kodeAkun: 'asc' },
@@ -254,19 +258,16 @@ export const getAccounts = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const voidTransaction = async (req: AuthRequest, res: Response) => {
+export const voidTransaction = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const id = req.params.id as string;
-        const perusahaanId = req.query.perusahaanId as string;
-
-        if (!perusahaanId) {
-            return res.status(400).json({ message: 'Perusahaan ID diperlukan' });
-        }
+        const perusahaanId = authReq.user.perusahaanId;
 
         const result = await prisma.$transaction(async (tx) => {
             // 1. Find the transaction with its details
             const transaction = await tx.transaksi.findUnique({
-                where: { id, perusahaanId: String(perusahaanId) },
+                where: { id, perusahaanId },
                 include: { detail: true }
             });
 
@@ -284,7 +285,7 @@ export const voidTransaction = async (req: AuthRequest, res: Response) => {
                 data: {
                     isVoid: true,
                     voidAt: new Date(),
-                    voidBy: req.user.username,
+                    voidBy: authReq.user.username,
                 }
             });
 

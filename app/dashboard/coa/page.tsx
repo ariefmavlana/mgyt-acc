@@ -1,0 +1,217 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+    Plus,
+    Search,
+    RefreshCcw,
+    Download,
+    Upload,
+    Filter
+} from 'lucide-react';
+import { COATree } from '@/components/coa/coa-tree';
+import { AccountForm } from '@/components/coa/account-form';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+} from '@/components/ui/sheet';
+import api from '@/lib/api';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+interface COANode {
+    id: string;
+    kodeAkun: string;
+    namaAkun: string;
+    tipe: string;
+    isHeader: boolean;
+    children: COANode[];
+    [key: string]: any;
+}
+
+export default function COAPage() {
+    const [data, setData] = useState<COANode[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<any>(null);
+    const [subParent, setSubParent] = useState<any>(null);
+
+    const fetchCOA = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/coa');
+            setData(res.data);
+        } catch (err) {
+            toast.error('Gagal memuat data akun');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchCOA();
+    }, [fetchCOA]);
+
+    const handleCreate = () => {
+        setSelectedAccount(null);
+        setSubParent(null);
+        setIsFormOpen(true);
+    };
+
+    const handleCreateSub = (parent: any) => {
+        setSelectedAccount(null);
+        setSubParent(parent);
+        setIsFormOpen(true);
+    };
+
+    const handleEdit = (account: any) => {
+        setSelectedAccount(account);
+        setSubParent(null);
+        setIsFormOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Apakah Anda yakin ingin menghapus akun ini?')) return;
+
+        try {
+            await api.delete(`/coa/${id}`);
+            toast.success('Akun berhasil dihapus');
+            fetchCOA();
+        } catch (err: any) {
+            const msg = err.response?.data?.message || 'Gagal menghapus akun';
+            toast.error(msg);
+        }
+    };
+
+    const handleFormSubmit = async (formData: any) => {
+        try {
+            if (selectedAccount) {
+                await api.put(`/coa/${selectedAccount.id}`, formData);
+                toast.success('Akun berhasil diperbarui');
+            } else {
+                await api.post('/coa', formData);
+                toast.success('Akun berhasil dibuat');
+            }
+            setIsFormOpen(false);
+            fetchCOA();
+        } catch (err: any) {
+            const msg = err.response?.data?.message || 'Gagal menyimpan akun';
+            toast.error(msg);
+        }
+    };
+
+    // Filter tree logic
+    const filteredData = useMemo(() => {
+        if (!search) return data;
+
+        const filterNodes = (nodes: COANode[]): COANode[] => {
+            return nodes
+                .map(node => ({ ...node }))
+                .filter(node => {
+                    const matches =
+                        node.namaAkun.toLowerCase().includes(search.toLowerCase()) ||
+                        node.kodeAkun.toLowerCase().includes(search.toLowerCase());
+
+                    if (node.children && node.children.length > 0) {
+                        node.children = filterNodes(node.children);
+                    }
+
+                    return matches || (node.children && node.children.length > 0);
+                });
+        };
+
+        return filterNodes(data);
+    }, [data, search]);
+
+    // Flatten for parent selection
+    const flattenNodes = (nodes: any[]): any[] => {
+        return nodes.reduce((acc, node) => {
+            acc.push(node);
+            if (node.children && node.children.length > 0) {
+                acc.push(...flattenNodes(node.children));
+            }
+            return acc;
+        }, []);
+    };
+    const flatAccounts = flattenNodes(data);
+
+    return (
+        <div className="p-6 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Daftar Akun (COA)</h1>
+                    <p className="text-slate-500">Kelola hierarki akun dan saldo buku besar Anda.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-2">
+                        <Upload className="h-4 w-4" /> Import
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" /> Export
+                    </Button>
+                    <Button onClick={handleCreate} className="btn-primary gap-2">
+                        <Plus className="h-4 w-4" /> Akun Baru
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                        placeholder="Cari kode atau nama akun..."
+                        className="pl-9 bg-white"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="secondary" size="icon" onClick={fetchCOA} disabled={loading}>
+                        <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+                    </Button>
+                    <Button variant="outline" className="gap-2">
+                        <Filter className="h-4 w-4" /> Filter
+                    </Button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200">
+                    <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+                    <p className="text-slate-500">Memuat hierarki akun...</p>
+                </div>
+            ) : (
+                <COATree
+                    data={filteredData}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onCreateSub={handleCreateSub}
+                />
+            )}
+
+            <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+                <SheetContent className="sm:max-w-xl overflow-y-auto">
+                    <SheetHeader className="mb-6">
+                        <SheetTitle>{selectedAccount ? 'Ubah Akun' : 'Tambah Akun Baru'}</SheetTitle>
+                        <SheetDescription>
+                            Isi detail akun di bawah ini. Akun yang memiliki induk akan menjadi sub-akun.
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <AccountForm
+                        initialData={selectedAccount || (subParent ? { parentId: subParent.id, tipe: subParent.tipe } : {})}
+                        parents={flatAccounts.filter((a: any) => a.isHeader && a.id !== selectedAccount?.id)}
+                        onSubmit={handleFormSubmit}
+                        isLoading={loading}
+                    />
+                </SheetContent>
+            </Sheet>
+        </div>
+    );
+}

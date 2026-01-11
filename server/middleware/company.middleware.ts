@@ -1,12 +1,13 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 
 /**
  * Middleware to ensure the user is accessing data 
  * within their own company context.
  */
-export const checkCompanyContext = (req: AuthRequest, res: Response, next: NextFunction) => {
-    const { user } = req;
+export const checkCompanyContext = (req: Request, res: Response, next: NextFunction) => {
+    const authReq = req as AuthRequest;
+    const { user } = authReq;
     const requestedPerusahaanId = req.params.perusahaanId || req.query.perusahaanId || req.body.perusahaanId;
 
     if (!user) {
@@ -22,6 +23,7 @@ export const checkCompanyContext = (req: AuthRequest, res: Response, next: NextF
     }
 
     // Inject perusahaanId into request object for easier access in controllers
+    req.body = req.body || {};
     req.body.perusahaanId = user.perusahaanId;
 
     next();

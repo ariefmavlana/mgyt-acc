@@ -8,6 +8,13 @@ import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.routes';
 import companyRoutes from './routes/company.routes';
 import transactionRoutes from './routes/transaction.routes';
+import coaRoutes from './routes/coa.routes';
+import invoiceRoutes from './routes/invoice.routes';
+import paymentRoutes from './routes/payment.routes';
+import contactRoutes from './routes/contact.routes';
+import productRoutes from './routes/product.routes';
+import inventoryRoutes from './routes/inventory.routes';
+import reportingRoutes from './routes/reporting.routes';
 
 const dev = process.env.NODE_ENV !== 'production';
 const nextApp = next({ dev });
@@ -38,6 +45,13 @@ nextApp.prepare().then(() => {
     app.use('/api/auth', authRoutes);
     app.use('/api/companies', companyRoutes);
     app.use('/api/transactions', transactionRoutes);
+    app.use('/api/coa', coaRoutes);
+    app.use('/api/invoices', invoiceRoutes);
+    app.use('/api/payments', paymentRoutes);
+    app.use('/api/contacts', contactRoutes);
+    app.use('/api/products', productRoutes);
+    app.use('/api/inventory', inventoryRoutes);
+    app.use('/api/reports', reportingRoutes);
 
     // Health Check
     app.get('/api/health', (req: Request, res: Response) => {

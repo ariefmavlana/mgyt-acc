@@ -9,7 +9,8 @@ export interface AuthRequest extends Request {
     user: Pengguna & { perusahaan: Perusahaan };
 }
 
-export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const protect = async (req: Request, res: Response, next: NextFunction) => {
+    const authReq = req as AuthRequest;
     let token: string | undefined;
 
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -40,13 +41,14 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
         return res.status(401).json({ message: 'Akun Anda sedang tidak aktif. Silakan hubungi admin.' });
     }
 
-    req.user = currentUser;
+    authReq.user = currentUser;
     next();
 };
 
 export const restrictTo = (...roles: Role[]) => {
-    return (req: AuthRequest, res: Response, next: NextFunction) => {
-        if (!req.user || !roles.includes(req.user.role)) {
+    return (req: Request, res: Response, next: NextFunction) => {
+        const authReq = req as AuthRequest;
+        if (!authReq.user || !roles.includes(authReq.user.role)) {
             return res.status(403).json({ message: 'Anda tidak memiliki izin untuk melakukan tindakan ini.' });
         }
         next();

@@ -1,12 +1,13 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { createCompanySchema, updateCompanySchema, settingsSchema } from '../validators/company.validator';
 import prisma from '../../lib/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { TierPaket } from '@prisma/client';
 
-export const getCompanies = async (req: AuthRequest, res: Response) => {
+export const getCompanies = async (req: Request, res: Response) => {
     try {
-        const userId = req.user.id;
+        const authReq = req as AuthRequest;
+        const userId = authReq.user.id;
         const page = parseInt((req.query.page as string) || '1');
         const limit = parseInt((req.query.limit as string) || '10');
         const skip = (page - 1) * limit;
@@ -46,10 +47,11 @@ export const getCompanies = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const getCompany = async (req: AuthRequest, res: Response) => {
+export const getCompany = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = authReq.user.id;
 
         const company = await prisma.perusahaan.findFirst({
             where: {
@@ -71,10 +73,11 @@ export const getCompany = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const createCompany = async (req: AuthRequest, res: Response) => {
+export const createCompany = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const { tier, ...rest } = createCompanySchema.parse(req.body);
-        const userId = req.user.id;
+        const userId = authReq.user.id;
 
         const company = await prisma.perusahaan.create({
             data: {
@@ -114,11 +117,12 @@ export const createCompany = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const updateCompany = async (req: AuthRequest, res: Response) => {
+export const updateCompany = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const { id } = req.params;
         const validatedData = updateCompanySchema.parse(req.body);
-        const userId = req.user.id;
+        const userId = authReq.user.id;
 
         // Verify ownership
         const companyExists = await prisma.perusahaan.findFirst({
@@ -146,10 +150,11 @@ export const updateCompany = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const deleteCompany = async (req: AuthRequest, res: Response) => {
+export const deleteCompany = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = authReq.user.id;
 
         const count = await prisma.perusahaan.count({
             where: { pengguna: { some: { id: userId } } }
@@ -176,11 +181,12 @@ export const deleteCompany = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const updateSettings = async (req: AuthRequest, res: Response) => {
+export const updateSettings = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const { id } = req.params;
         const validatedData = settingsSchema.parse(req.body);
-        const userId = req.user.id;
+        const userId = authReq.user.id;
 
         const company = await prisma.perusahaan.findFirst({
             where: { id: String(id), pengguna: { some: { id: userId } } }
