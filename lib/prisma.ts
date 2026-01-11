@@ -5,6 +5,8 @@ import { PrismaPg } from '@prisma/adapter-pg'
 // Prisma 7 with Driver Adapter (PostgreSQL)
 // This pattern avoids issues with serverless and provides better connection pooling control
 
+import { tenantExtension } from '../server/lib/prisma-tenant'
+
 const connectionString = process.env.DATABASE_URL
 
 if (!connectionString) {
@@ -14,14 +16,14 @@ if (!connectionString) {
 const pool = new Pool({ connectionString })
 const adapter = new PrismaPg(pool)
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
+const globalForPrisma = globalThis as unknown as { prisma: any }
 
-export const prisma =
-    globalForPrisma.prisma ||
-    new PrismaClient({
-        adapter,
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    })
+const basePrisma = new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+})
+
+export const prisma = basePrisma.$extends(tenantExtension)
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 

@@ -13,7 +13,7 @@ export const getProducts = async (req: Request, res: Response) => {
         const skip = (page - 1) * limit;
 
         const where: any = {
-            perusahaanId: authReq.user.perusahaanId,
+            perusahaanId: authReq.currentCompanyId!,
             isAktif: true
         };
 
@@ -65,7 +65,7 @@ export const getProduct = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
 
         const product = await prisma.produk.findUnique({
-            where: { id, perusahaanId: authReq.user.perusahaanId },
+            where: { id: String(id), perusahaanId: authReq.currentCompanyId },
             include: {
                 persediaan: { include: { stok: { include: { gudang: true } } } },
                 variant: true
@@ -84,7 +84,7 @@ export const createProduct = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const validatedData = createProductSchema.parse(req.body);
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         // Transaction to create Product AND linked Persediaan (Inventory Item)
         const result = await prisma.$transaction(async (tx) => {
@@ -150,7 +150,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         const validatedData = updateProductSchema.parse(req.body);
 
         const product = await prisma.produk.update({
-            where: { id, perusahaanId: authReq.user.perusahaanId },
+            where: { id: String(id), perusahaanId: authReq.currentCompanyId },
             data: {
                 ...validatedData,
                 variant: undefined // Handle variants separately if needed
@@ -182,7 +182,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
 
         // Soft delete
         await prisma.produk.update({
-            where: { id, perusahaanId: authReq.user.perusahaanId },
+            where: { id: String(id), perusahaanId: authReq.currentCompanyId },
             data: { isAktif: false }
         });
 

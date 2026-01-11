@@ -16,7 +16,7 @@ const createPaymentSchema = z.object({
 export const receivePayment = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
         const validatedData = createPaymentSchema.parse(req.body);
 
         // 1. Validate Invoice & Piutang
@@ -88,9 +88,7 @@ export const receivePayment = async (req: Request, res: Response) => {
             let debitAccountId: string | undefined;
 
             if (validatedData.bankRekeningId) {
-                // Fetch Bank Account linked COA
-                const bank = await tx.bankRekening.findUnique({ where: { id: validatedData.bankRekeningId } });
-                if (bank) debitAccountId = bank.akunId;
+                // Future: Link BankRekening to COA. For now, use default Cash/Bank account.
             }
 
             if (!debitAccountId) {

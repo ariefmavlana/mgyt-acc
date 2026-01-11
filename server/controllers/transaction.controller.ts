@@ -2,12 +2,12 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
 import { createTransactionSchema } from '../validators/transaction.validator';
-import { Prisma } from '@prisma/client';
+import { Prisma, TipeTransaksi } from '@prisma/client';
 
 export const getTransactions = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const page = parseInt((req.query.page as string) || '1');
         const limit = parseInt((req.query.limit as string) || '10');
@@ -71,8 +71,8 @@ export const getTransactions = async (req: Request, res: Response) => {
 export const createTransaction = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
         const validatedData = createTransactionSchema.parse(req.body);
-        const perusahaanId = authReq.user.perusahaanId;
 
         const result = await prisma.$transaction(async (tx) => {
             // 1. Find or create active period
@@ -94,7 +94,7 @@ export const createTransaction = async (req: Request, res: Response) => {
                 // In strict systems, this should error. Let's create it for now to be user-friendly.
                 period = await tx.periodeAkuntansi.create({
                     data: {
-                        perusahaanId,
+                        perusahaanId: perusahaanId!,
                         bulan: month,
                         tahun: year,
                         nama: `${month}-${year}`,
@@ -116,7 +116,7 @@ export const createTransaction = async (req: Request, res: Response) => {
                     penggunaId: authReq.user.id,
                     nomorTransaksi: transNo,
                     tanggal: date,
-                    tipe: validatedData.tipe as 'PENJUALAN' | 'PEMBELIAN' | 'JURNAL_UMUM',
+                    tipe: validatedData.tipe as TipeTransaksi,
                     deskripsi: validatedData.deskripsi,
                     referensi: validatedData.referensi,
                     total: totalAmount,
@@ -233,7 +233,7 @@ export const createTransaction = async (req: Request, res: Response) => {
 export const getAccounts = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const accounts = await prisma.chartOfAccounts.findMany({
             where: {
@@ -262,7 +262,7 @@ export const voidTransaction = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const result = await prisma.$transaction(async (tx) => {
             // 1. Find the transaction with its details

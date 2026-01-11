@@ -12,7 +12,7 @@ interface COANode extends ChartOfAccounts {
 export const getCOATree = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
         const { type, flatten } = req.query; // Add support for filtering and flattening
 
         const where: any = { perusahaanId };
@@ -75,7 +75,7 @@ export const getCOADetail = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const account = await prisma.chartOfAccounts.findFirst({
             where: { id, perusahaanId },
@@ -100,7 +100,7 @@ export const createCOA = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const validatedData = createCOASchema.parse(req.body);
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         let level = 1;
         if (validatedData.parentId) {
@@ -141,7 +141,7 @@ export const updateCOA = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
         const validatedData = updateCOASchema.parse(req.body);
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const existing = await prisma.chartOfAccounts.findFirst({
             where: { id, perusahaanId }
@@ -175,7 +175,7 @@ export const deleteCOA = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         // Check if has transactions
         const transactionCount = await prisma.jurnalDetail.count({
@@ -210,7 +210,7 @@ export const getAccountLedger = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
         const startDate = req.query.startDate as string | undefined;
         const endDate = req.query.endDate as string | undefined;
 
@@ -275,7 +275,7 @@ export const getAccountBalance = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
         const startDate = req.query.startDate as string | undefined;
         const endDate = req.query.endDate as string | undefined;
 

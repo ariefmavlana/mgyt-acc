@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export enum TipeTransaksi {
+    JURNAL_UMUM = 'JURNAL_UMUM',
     PENJUALAN = 'PENJUALAN',
     PEMBELIAN = 'PEMBELIAN',
     BIAYA = 'BIAYA',

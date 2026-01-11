@@ -40,20 +40,18 @@ import { Card, CardContent } from '@/components/ui/card';
 // Schema Validation (Frontend Mirror of Backend Validator)
 const invoiceFormSchema = z.object({
     pelangganId: z.string().min(1, 'Pelanggan harus dipilih'),
-    tanggal: z.date({
-        required_error: 'Tanggal invoice harus diisi',
-    }),
+    tanggal: z.date(),
     tanggalJatuhTempo: z.date().optional(),
-    terminPembayaran: z.coerce.number().min(0).default(30),
+    terminPembayaran: z.number().min(0).default(30),
     nomorInvoice: z.string().optional(),
     referensi: z.string().optional(),
     catatan: z.string().optional(),
     items: z.array(z.object({
         akunId: z.string().min(1, 'Akun pendapatan harus dipilih'),
         deskripsi: z.string().min(1, 'Deskripsi item harus diisi'),
-        kuantitas: z.coerce.number().min(1, 'Qty minimal 1'),
-        hargaSatuan: z.coerce.number().min(0, 'Harga tidak boleh negatif'),
-        diskon: z.coerce.number().min(0).optional().default(0),
+        kuantitas: z.number().min(1, 'Qty minimal 1'),
+        hargaSatuan: z.number().min(0, 'Harga tidak boleh negatif'),
+        diskon: z.number().min(0).default(0),
     })).min(1, 'Minimal satu item harus ditambahkan'),
 });
 
@@ -66,7 +64,7 @@ export function InvoiceForm() {
     const [isLoadingData, setIsLoadingData] = useState(true);
 
     const form = useForm<InvoiceFormValues>({
-        resolver: zodResolver(invoiceFormSchema),
+        resolver: zodResolver(invoiceFormSchema) as any,
         defaultValues: {
             tanggal: new Date(),
             terminPembayaran: 30,
@@ -220,7 +218,7 @@ export function InvoiceForm() {
                                         <FormItem>
                                             <FormLabel>Termin (Hari)</FormLabel>
                                             <FormControl>
-                                                <Input type="number" {...field} />
+                                                <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>

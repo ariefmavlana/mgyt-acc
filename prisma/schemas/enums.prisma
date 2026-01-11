@@ -307,3 +307,11 @@ enum TipeWidget {
     LIST
     CALENDAR
 }
+
+enum OnboardingStatus {
+    PENDING
+    STEP1_COMPLETED
+    STEP2_COMPLETED
+    STEP3_COMPLETED
+    COMPLETED
+}

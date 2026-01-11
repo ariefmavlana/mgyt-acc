@@ -88,7 +88,7 @@ export default function CompanySettingsPage() {
                             <CardDescription>Informasi legal dan kontak operasional.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <CompanyForm initialData={company} onSubmit={handleUpdate} />
+                            <CompanyForm initialData={company || undefined} onSubmit={handleUpdate} />
                         </CardContent>
                     </Card>
                 </TabsContent>

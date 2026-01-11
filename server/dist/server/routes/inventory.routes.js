@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const company_middleware_1 = require("../middleware/company.middleware");
+const inventory_controller_1 = require("../controllers/inventory.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.protect);
+router.use(company_middleware_1.checkCompanyContext);
+router.get('/stock', inventory_controller_1.getStock);
+router.post('/movement', inventory_controller_1.recordMovement);
+router.get('/movement', inventory_controller_1.getMovementHistory);
+exports.default = router;

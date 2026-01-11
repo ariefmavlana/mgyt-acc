@@ -8,7 +8,7 @@ import PDFDocument from 'pdfkit';
 export const createInvoice = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
         const validatedData = createInvoiceSchema.parse(req.body);
 
         const result = await prisma.$transaction(async (tx) => {
@@ -32,7 +32,7 @@ export const createInvoice = async (req: Request, res: Response) => {
             if (!period) {
                 period = await tx.periodeAkuntansi.create({
                     data: {
-                        perusahaanId,
+                        perusahaanId: perusahaanId!,
                         bulan: month,
                         tahun: year,
                         nama: `${month}-${year}`,
@@ -56,25 +56,21 @@ export const createInvoice = async (req: Request, res: Response) => {
                     hargaSatuan: item.hargaSatuan,
                     diskon: item.diskon,
                     subtotal: amount,
-                    // For TransaksiDetail (standardized)
-                    // CREDIT side for Revenue (Sales)
-                    // We store it as 'subtotal' here, but logic below handles GL
                 };
             });
 
-            // Assuming no tax for simplicity first (add tax logic later or if passed)
             const total = subtotal;
 
-            // 5. Create Transaksi (The Invoice Header)
+            // 5. Create Transaksi
             const transaksi = await tx.transaksi.create({
                 data: {
-                    perusahaanId,
+                    perusahaanId: perusahaanId!,
                     penggunaId: authReq.user.id,
                     nomorTransaksi: invNo,
                     tanggal,
                     tanggalJatuhTempo: jatuhTempo,
                     termPembayaran: validatedData.terminPembayaran,
-                    tipe: 'PENJUALAN', // Mapping Invoice to Transaction Type
+                    tipe: 'PENJUALAN',
                     deskripsi: validatedData.catatan || `Invoice ${invNo}`,
                     referensi: validatedData.referensi,
                     subtotal,
@@ -88,7 +84,7 @@ export const createInvoice = async (req: Request, res: Response) => {
                     detail: {
                         create: detailItems.map(item => ({
                             urutan: item.urutan,
-                            akunId: item.akunId, // Revenue Account
+                            akunId: item.akunId,
                             deskripsi: item.deskripsi,
                             kuantitas: item.kuantitas,
                             hargaSatuan: item.hargaSatuan,
@@ -99,30 +95,30 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 6. Create Piutang Record
+            // 6. Create Piutang
             await tx.piutang.create({
                 data: {
-                    perusahaanId,
+                    perusahaanId: perusahaanId!,
                     pelangganId: validatedData.pelangganId,
                     transaksiId: transaksi.id,
                     nomorPiutang: invNo,
                     tanggalPiutang: tanggal,
                     tanggalJatuhTempo: jatuhTempo,
                     jumlahPiutang: total,
-                    sisaPiutang: total, // Initially full amount
+                    sisaPiutang: total,
                     statusPembayaran: 'BELUM_DIBAYAR',
                     keterangan: validatedData.catatan
                 }
             });
 
-            // 7. Create Voucher (Accounting Record)
+            // 7. Create Voucher
             const voucher = await tx.voucher.create({
                 data: {
-                    perusahaanId,
+                    perusahaanId: perusahaanId!,
                     transaksiId: transaksi.id,
-                    nomorVoucher: `VCH-${invNo}`, // Or auto-sequence
+                    nomorVoucher: `VCH-${invNo}`,
                     tanggal,
-                    tipe: 'JURNAL_UMUM', // Or SALES_JOURNAL if available
+                    tipe: 'JURNAL_UMUM',
                     deskripsi: `Penjualan ${invNo}`,
                     totalDebit: total,
                     totalKredit: total,
@@ -130,35 +126,24 @@ export const createInvoice = async (req: Request, res: Response) => {
                     dibuatOlehId: authReq.user.id,
                     isPosted: true,
                     postedAt: new Date(),
-                    postedBy: authReq.user.username,
-                    detail: {
-                        create: [
-                            // DEBIT: Accounts Receivable (Piutang Usaha)
-                            // We need to fetch the AR Account from Settings or use a default
-                            // For now, let's assume we look up via Pelanggan group OR default settings.
-                            // fallback: Find first account with type 'PIUTANG_USAHA' or similar.
-                        ]
-                    }
+                    postedBy: authReq.user.username
                 }
             });
 
-            // WAIT: We need the AR Account ID.
-            // Let's fetch the default AR account for the company.
-            // If not found, we cannot post.
+            // 8. Find AR account
             const arAccount = await tx.chartOfAccounts.findFirst({
                 where: {
                     perusahaanId,
-                    tipe: 'ASET', // Or specific category
+                    tipe: 'ASET',
                     kategoriAset: 'PIUTANG_USAHA'
                 }
             });
 
             if (!arAccount) {
-                throw new Error('Akun Piutang Usaha tidak ditemukan (Default AR Account missing)');
+                throw new Error('Akun Piutang Usaha tidak ditemukan');
             }
 
-            // Populate Voucher Detail
-            // 7.1 Debit AR
+            // 9. Voucher Details
             await tx.voucherDetail.create({
                 data: {
                     voucherId: voucher.id,
@@ -170,14 +155,13 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 7.2 Credit Revenue (Items)
             let seq = 2;
             for (const item of detailItems) {
                 await tx.voucherDetail.create({
                     data: {
                         voucherId: voucher.id,
                         urutan: seq++,
-                        akunId: item.akunId, // This comes from invalid form (Revenue Account)
+                        akunId: item.akunId,
                         deskripsi: item.deskripsi,
                         debit: 0,
                         kredit: item.subtotal
@@ -185,10 +169,10 @@ export const createInvoice = async (req: Request, res: Response) => {
                 });
             }
 
-            // 8. Create Jurnal Umum
+            // 10. Jurnal Umum
             await tx.jurnalUmum.create({
                 data: {
-                    perusahaanId,
+                    perusahaanId: perusahaanId!,
                     periodeId: period.id,
                     voucherId: voucher.id,
                     nomorJurnal: `GL-${invNo}`,
@@ -206,7 +190,7 @@ export const createInvoice = async (req: Request, res: Response) => {
                                 deskripsi: `Piutang - ${invNo}`,
                                 debit: total,
                                 kredit: 0,
-                                saldoSesudah: 0 // Trigger update later
+                                saldoSesudah: 0
                             },
                             ...detailItems.map((item, i) => ({
                                 urutan: i + 2,
@@ -221,23 +205,16 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 9. Update COA Balances
-            // Update AR Account (Debit increases Asset)
+            // 11. Update balances
             await tx.chartOfAccounts.update({
                 where: { id: arAccount.id },
                 data: { saldoBerjalan: { increment: total } }
             });
 
-            // Update Revenue Accounts (Credit increases Revenue - normally credit balance)
-            // If logic says "saldoBerjalan = debit - kredit", then revenue increases make it more negative?
-            // Or if normalBalance is Credit, we handle it differently.
-            // Standard approach: Saldo = Debit - Kredit. 
-            // So Revenue (Credit) decreases the 'net number' if strictly D-K.
-            // Let's stick to D-K simple math.
             for (const item of detailItems) {
                 await tx.chartOfAccounts.update({
                     where: { id: item.akunId },
-                    data: { saldoBerjalan: { decrement: item.subtotal } } // Credit decreases ( D - K )
+                    data: { saldoBerjalan: { decrement: item.subtotal } }
                 });
             }
 
@@ -248,7 +225,6 @@ export const createInvoice = async (req: Request, res: Response) => {
             message: 'Invoice berhasil dibuat',
             data: result
         });
-
     } catch (error: any) {
         console.error('Invoice Creation Error:', error);
         res.status(500).json({ message: error.message || 'Gagal membuat invoice' });
@@ -265,7 +241,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         const skip = (Number(page) - 1) * Number(limit);
 
         const where: any = {
-            perusahaanId: authReq.user.perusahaanId,
+            perusahaanId: authReq.currentCompanyId,
             tipe: 'PENJUALAN'
         };
 
@@ -313,7 +289,7 @@ export const getInvoiceDetail = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
 
         const invoice = await prisma.transaksi.findUnique({
-            where: { id, perusahaanId: authReq.user.perusahaanId },
+            where: { id: String(id), perusahaanId: authReq.currentCompanyId },
             include: {
                 pelanggan: true,
                 detail: {
@@ -341,7 +317,7 @@ export const generateInvoicePDF = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
 
         const invoice: any = await prisma.transaksi.findUnique({
-            where: { id, perusahaanId: authReq.user.perusahaanId },
+            where: { id: String(id), perusahaanId: authReq.currentCompanyId },
             include: {
                 pelanggan: true,
                 detail: {
@@ -390,7 +366,7 @@ export const generateInvoicePDF = async (req: Request, res: Response) => {
         doc.font('Helvetica');
 
         // --- ITEMS ---
-        invoice.detail.forEach(item => {
+        invoice.detail.forEach((item: any) => {
             doc.text(item.deskripsi || item.akun.namaAkun, 50, y);
             doc.text(Number(item.kuantitas).toString(), 300, y, { width: 50, align: 'center' });
             doc.text(new Intl.NumberFormat('id-ID').format(Number(item.hargaSatuan)), 350, y, { width: 90, align: 'right' });
@@ -421,7 +397,7 @@ export const generateInvoicePDF = async (req: Request, res: Response) => {
 export const getAgingSchedule = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const piutangs = await prisma.piutang.findMany({
             where: {
@@ -486,7 +462,7 @@ export const getInvoiceAging = async (req: Request, res: Response) => {
         const piutang = await prisma.piutang.findFirst({
             where: {
                 transaksiId: id as string,
-                perusahaanId: authReq.user.perusahaanId
+                perusahaanId: authReq.currentCompanyId!
             }
         });
 

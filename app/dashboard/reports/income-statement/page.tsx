@@ -7,6 +7,45 @@ import { ReportFilter } from '@/components/reports/report-filter';
 import { FinancialReportLayout } from '@/components/reports/financial-report-layout';
 import { Loader2 } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
+
+interface ISAccount {
+    id: string;
+    kodeAkun: string;
+    namaAkun: string;
+    saldo: number;
+}
+
+interface ISReport {
+    revenue: ISAccount[];
+    expense: ISAccount[];
+    summary: {
+        totalRevenue: number;
+        totalExpense: number;
+        netIncome: number;
+    };
+}
+
+interface AccountRowProps {
+    name: string;
+    code: string;
+    amount: number;
+    isTotal?: boolean;
+    level?: number;
+    isNegative?: boolean;
+}
+
+const AccountRow = ({ name, code, amount, isTotal = false, level = 0, isNegative = false }: AccountRowProps) => (
+    <div className={`flex justify-between py-1 ${isTotal ? 'font-bold border-t border-slate-300 mt-2 pt-2' : ''}`} style={{ paddingLeft: `${level * 16}px` }}>
+        <div className="flex gap-4">
+            <span className="text-slate-500 font-mono text-xs pt-1 w-16">{code}</span>
+            <span>{name}</span>
+        </div>
+        <span className={isNegative ? 'text-red-600' : ''}>
+            {isNegative && amount > 0 ? `(${formatCurrency(amount).replace('Rp', '')})` : formatCurrency(amount)}
+        </span>
+    </div>
+);
 
 export default function IncomeStatementPage() {
     const [range, setRange] = useState({
@@ -14,7 +53,7 @@ export default function IncomeStatementPage() {
         to: endOfMonth(new Date())
     });
 
-    const { data: report, isLoading, refetch } = useQuery({
+    const { data: report, isLoading, refetch } = useQuery<ISReport>({
         queryKey: ['income-statement', range],
         queryFn: async () => {
             const res = await api.get('/reports/income-statement', {
@@ -26,22 +65,6 @@ export default function IncomeStatementPage() {
             return res.data;
         }
     });
-
-    const formatMoney = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
-    };
-
-    const AccountRow = ({ name, code, amount, isTotal = false, level = 0, isNegative = false }: any) => (
-        <div className={`flex justify-between py-1 ${isTotal ? 'font-bold border-t border-slate-300 mt-2 pt-2' : ''}`} style={{ paddingLeft: `${level * 16}px` }}>
-            <div className="flex gap-4">
-                <span className="text-slate-500 font-mono text-xs pt-1 w-16">{code}</span>
-                <span>{name}</span>
-            </div>
-            <span className={isNegative ? 'text-red-600' : ''}>
-                {isNegative && amount > 0 ? `(${formatMoney(amount).replace('Rp', '')})` : formatMoney(amount)}
-            </span>
-        </div>
-    );
 
     return (
         <div className="p-6">
@@ -69,7 +92,7 @@ export default function IncomeStatementPage() {
                         <div>
                             <h3 className="font-bold text-lg uppercase mb-4 border-b pb-2 bg-slate-50 p-2">Pendapatan (Revenue)</h3>
                             <div className="space-y-1 px-4">
-                                {report.revenue.map((acc: any) => (
+                                {report.revenue.map((acc) => (
                                     <AccountRow key={acc.id} name={acc.namaAkun} code={acc.kodeAkun} amount={acc.saldo} />
                                 ))}
                             </div>
@@ -82,7 +105,7 @@ export default function IncomeStatementPage() {
                         <div>
                             <h3 className="font-bold text-lg uppercase mb-4 border-b pb-2 bg-slate-50 p-2">Beban (Expenses)</h3>
                             <div className="space-y-1 px-4">
-                                {report.expense.map((acc: any) => (
+                                {report.expense.map((acc) => (
                                     <AccountRow key={acc.id} name={acc.namaAkun} code={acc.kodeAkun} amount={acc.saldo} />
                                 ))}
                             </div>
@@ -96,7 +119,7 @@ export default function IncomeStatementPage() {
                             <div className="flex justify-between items-center text-lg font-bold">
                                 <span>LABA / (RUGI) BERSIH</span>
                                 <span className={report.summary.netIncome < 0 ? 'text-red-600' : 'text-green-700'}>
-                                    {formatMoney(report.summary.netIncome)}
+                                    {formatCurrency(report.summary.netIncome)}
                                 </span>
                             </div>
                         </div>

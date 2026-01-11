@@ -53,22 +53,24 @@ model KursHistory {
 // ============================================================================
 
 model Perusahaan {
-    id          String  @id @default(cuid())
-    kode        String  @unique
-    nama        String
-    namaLengkap String?
-    bentukUsaha String?
-    bidangUsaha String?
-    alamat      String?
-    kelurahan   String?
-    kecamatan   String?
-    kota        String?
-    provinsi    String?
-    kodePos     String?
-    telepon     String?
-    fax         String?
-    email       String?
-    website     String?
+    id               String           @id @default(cuid())
+    kode             String           @unique
+    nama             String
+    deskripsi        String?
+    onboardingStatus OnboardingStatus @default(PENDING)
+    namaLengkap      String?
+    bentukUsaha      String?
+    bidangUsaha      String?
+    alamat           String?
+    kelurahan        String?
+    kecamatan        String?
+    kota             String?
+    provinsi         String?
+    kodePos          String?
+    telepon          String?
+    fax              String?
+    email            String?
+    website          String?
 
     npwp          String?
     nib           String?
@@ -85,7 +87,7 @@ model Perusahaan {
     anak    Perusahaan[] @relation("GrupPerusahaan")
 
     cabang            Cabang[]
-    pengguna          Pengguna[]
+    aksesPengguna     AksesPengguna[]
     coa               ChartOfAccounts[]
     transaksi         Transaksi[]
     voucher           Voucher[]
@@ -193,9 +195,9 @@ model Cabang {
     isAktif  Boolean @default(true)
     isKantor Boolean @default(false)
 
-    pengguna  Pengguna[]
-    transaksi Transaksi[]
-    gudang    Gudang[]
+    aksesPengguna AksesPengguna[]
+    transaksi     Transaksi[]
+    gudang        Gudang[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -205,29 +207,28 @@ model Cabang {
 }
 
 model Pengguna {
-    id           String     @id @default(cuid())
-    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
-    perusahaanId String
-
-    cabang   Cabang? @relation(fields: [cabangId], references: [id])
-    cabangId String?
+    id String @id @default(cuid())
 
     username String @unique
     email    String @unique
     password String
 
     namaLengkap String
-    role        Role   @default(STAFF)
 
     foto    String?
     telepon String?
 
-    isAktif       Boolean   @default(true)
-    emailVerified Boolean   @default(false)
-    lastLogin     DateTime?
+    isAktif           Boolean   @default(true)
+    emailVerified     Boolean   @default(false)
+    lastLogin         DateTime?
+    passwordChangedAt DateTime? @default(now())
 
-    aksesModul  Json? // {"inventory": true, "payroll": false}
-    permissions Json? // custom permissions
+    // Security Hardening
+    failedLoginAttempts Int       @default(0)
+    lockoutUntil        DateTime?
+
+    aksesModul  Json? // {"inventory": true, "payroll": false} (Global/Default)
+    permissions Json? // Global permissions
 
     voucher          Voucher[]
     transaksi        Transaksi[]
@@ -238,13 +239,41 @@ model Pengguna {
     dashboardWidgets DashboardWidget[]
     uploadedDocs     DokumenTransaksi[]
 
+    // Multi-Tenant Access
+    aksesPerusahaan AksesPengguna[]
+
+    // Security Hardening Relations
+    refreshTokens     RefreshToken[]
+    passwordHistories PasswordHistory[]
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@index([perusahaanId])
     @@index([email])
 }
 
-// ============================================================================
-// CHART OF ACCOUNTS
-// ============================================================================
+model AksesPengguna {
+    id           String     @id @default(cuid())
+    pengguna     Pengguna   @relation(fields: [penggunaId], references: [id], onDelete: Cascade)
+    penggunaId   String
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id], onDelete: Cascade)
+    perusahaanId String
+    cabang       Cabang?    @relation(fields: [cabangId], references: [id])
+    cabangId     String?
+
+    role      Role    @default(STAFF)
+    isAktif   Boolean @default(true)
+    isDefault Boolean @default(false)
+
+    // Per-company permissions/access
+    aksesModul  Json?
+    permissions Json?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([penggunaId, perusahaanId])
+    @@index([penggunaId])
+    @@index([perusahaanId])
+    @@index([cabangId])
+}

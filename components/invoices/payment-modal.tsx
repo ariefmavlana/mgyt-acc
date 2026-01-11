@@ -46,7 +46,7 @@ import { Calendar } from '@/components/ui/calendar';
 
 const paymentSchema = z.object({
     tanggal: z.date(),
-    jumlah: z.coerce.number().min(1, 'Jumlah harus > 0'),
+    jumlah: z.number().min(1, 'Jumlah harus > 0'),
     metodePembayaran: z.enum(['TUNAI', 'TRANSFER_BANK', 'CEK', 'GIRO', 'KARTU_KREDIT', 'KARTU_DEBIT', 'E_WALLET', 'VIRTUAL_ACCOUNT']),
     nomorReferensi: z.string().optional(),
     catatan: z.string().optional(),
@@ -65,7 +65,7 @@ export function PaymentModal({ invoiceId, sisaTagihan, onSuccess, trigger }: Pay
     const [open, setOpen] = useState(false);
 
     const form = useForm<PaymentFormValues>({
-        resolver: zodResolver(paymentSchema),
+        resolver: zodResolver(paymentSchema) as any,
         defaultValues: {
             tanggal: new Date(),
             jumlah: sisaTagihan,
@@ -152,7 +152,7 @@ export function PaymentModal({ invoiceId, sisaTagihan, onSuccess, trigger }: Pay
                                 <FormItem>
                                     <FormLabel>Jumlah Bayar (Max: {new Intl.NumberFormat('id-ID').format(sisaTagihan)})</FormLabel>
                                     <FormControl>
-                                        <Input type="number" {...field} />
+                                        <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

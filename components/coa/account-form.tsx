@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
@@ -38,7 +38,7 @@ interface AccountFormProps {
 
 export function AccountForm({ initialData, parents, onSubmit, isLoading }: AccountFormProps) {
     const form = useForm<AccountFormData>({
-        resolver: zodResolver(createCOASchema) as any,
+        resolver: zodResolver(createCOASchema) as Resolver<AccountFormData>,
         defaultValues: {
             kodeAkun: initialData?.kodeAkun || '',
             namaAkun: initialData?.namaAkun || '',
@@ -55,7 +55,7 @@ export function AccountForm({ initialData, parents, onSubmit, isLoading }: Accou
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <FormField
                         control={form.control}

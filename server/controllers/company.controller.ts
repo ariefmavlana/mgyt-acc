@@ -15,8 +15,8 @@ export const getCompanies = async (req: Request, res: Response) => {
         const [companies, total] = await Promise.all([
             prisma.perusahaan.findMany({
                 where: {
-                    pengguna: {
-                        some: { id: userId }
+                    aksesPengguna: {
+                        some: { penggunaId: userId }
                     }
                 },
                 skip,
@@ -25,8 +25,8 @@ export const getCompanies = async (req: Request, res: Response) => {
             }),
             prisma.perusahaan.count({
                 where: {
-                    pengguna: {
-                        some: { id: userId }
+                    aksesPengguna: {
+                        some: { penggunaId: userId }
                     }
                 }
             })
@@ -56,8 +56,8 @@ export const getCompany = async (req: Request, res: Response) => {
         const company = await prisma.perusahaan.findFirst({
             where: {
                 id: id as string,
-                pengguna: {
-                    some: { id: userId }
+                aksesPengguna: {
+                    some: { penggunaId: userId }
                 }
             }
         });
@@ -79,14 +79,26 @@ export const createCompany = async (req: Request, res: Response) => {
         const { tier, ...rest } = createCompanySchema.parse(req.body);
         const userId = authReq.user.id;
 
-        const company = await prisma.perusahaan.create({
-            data: {
-                ...rest,
-                kode: rest.nama.substring(0, 3).toUpperCase() + Math.floor(Math.random() * 1000),
-                pengguna: {
-                    connect: { id: userId }
+        const company = await prisma.$transaction(async (tx) => {
+            const comp = await tx.perusahaan.create({
+                data: {
+                    ...rest,
+                    kode: rest.nama.substring(0, 3).toUpperCase() + Math.floor(Math.random() * 1000),
                 }
-            }
+            });
+
+            // Create default access
+            await tx.aksesPengguna.create({
+                data: {
+                    penggunaId: userId,
+                    perusahaanId: comp.id,
+                    role: 'ADMIN', // creator defaults to ADMIN
+                    isAktif: true,
+                    isDefault: true
+                }
+            });
+
+            return comp;
         });
 
         // Assign initial package
@@ -126,7 +138,7 @@ export const updateCompany = async (req: Request, res: Response) => {
 
         // Verify ownership
         const companyExists = await prisma.perusahaan.findFirst({
-            where: { id: String(id), pengguna: { some: { id: userId } } }
+            where: { id: String(id), aksesPengguna: { some: { penggunaId: userId } } }
         });
 
         if (!companyExists) {
@@ -157,7 +169,7 @@ export const deleteCompany = async (req: Request, res: Response) => {
         const userId = authReq.user.id;
 
         const count = await prisma.perusahaan.count({
-            where: { pengguna: { some: { id: userId } } }
+            where: { aksesPengguna: { some: { penggunaId: userId } } }
         });
 
         if (count <= 1) {
@@ -165,7 +177,7 @@ export const deleteCompany = async (req: Request, res: Response) => {
         }
 
         const company = await prisma.perusahaan.findFirst({
-            where: { id: String(id), pengguna: { some: { id: userId } } }
+            where: { id: String(id), aksesPengguna: { some: { penggunaId: userId } } }
         });
 
         if (!company) {
@@ -189,7 +201,7 @@ export const updateSettings = async (req: Request, res: Response) => {
         const userId = authReq.user.id;
 
         const company = await prisma.perusahaan.findFirst({
-            where: { id: String(id), pengguna: { some: { id: userId } } }
+            where: { id: String(id), aksesPengguna: { some: { penggunaId: userId } } }
         });
 
         if (!company) {

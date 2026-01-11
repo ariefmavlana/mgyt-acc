@@ -102,7 +102,7 @@ export const getBalanceSheet = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { endDate } = req.query;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const end = endDate ? String(endDate) : new Date().toISOString();
         const startOfCurrentYear = startOfYear(new Date(end)).toISOString();
@@ -152,7 +152,7 @@ export const getIncomeStatement = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { startDate, endDate } = req.query;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const start = startDate ? new Date(String(startDate)) : startOfYear(new Date());
         const end = endDate ? endOfDay(new Date(String(endDate))) : endOfDay(new Date());

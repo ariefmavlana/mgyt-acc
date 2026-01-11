@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { registerSchema, loginSchema } from '../validators/auth.validator';
+import { registerSchema, loginSchema, changePasswordSchema } from '../validators/auth.validator';
 import prisma from '../../lib/prisma';
 import { hashPassword, comparePassword } from '../utils/password';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../utils/jwt';
 import { Role } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -68,25 +68,58 @@ export const register = async (req: Request, res: Response) => {
                     username: validatedData.username,
                     email: validatedData.email,
                     password: hashedPassword,
-                    role: validatedData.role as Role,
-                    perusahaanId,
+                }
+            });
+
+            const access = await tx.aksesPengguna.create({
+                data: {
+                    penggunaId: newUser.id,
+                    perusahaanId: perusahaanId,
+                    role: (validatedData.role as Role) || 'ADMIN',
+                    isDefault: true,
+                    isAktif: true
                 },
                 include: { perusahaan: true }
             });
 
-            return newUser;
+            return { ...newUser, activeAkses: access };
         });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password: _, ...userWithoutPassword } = result;
+
+        // Store initial password in history
+        await prisma.passwordHistory.create({
+            data: {
+                userId: result.id,
+                password: hashedPassword
+            }
+        });
+
+        // Audit Log
+        await prisma.jejakAudit.create({
+            data: {
+                perusahaanId: result.activeAkses.perusahaanId,
+                penggunaId: result.id,
+                aksi: 'REGISTER',
+                modul: 'AUTH',
+                namaTabel: 'Pengguna',
+                idData: result.id,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+                keterangan: 'Pendaftaran akun baru'
+            }
+        });
+
         res.status(201).json({
             message: 'Pendaftaran berhasil. Silakan login dengan akun Anda.',
             user: userWithoutPassword
         });
     } catch (error: unknown) {
         if (error instanceof Error && error.name === 'ZodError') {
-            const zodError = error as unknown as { errors: Array<{ message: string }> };
-            return res.status(400).json({ message: zodError.errors[0].message, errors: zodError.errors });
+            const zodError = error as any;
+            const message = zodError.errors?.[0]?.message || 'Kesalahan validasi data';
+            return res.status(400).json({ message, errors: zodError.errors });
         }
         console.error(error);
         res.status(500).json({ message: 'Error server saat pendaftaran' });
@@ -99,10 +132,54 @@ export const login = async (req: Request, res: Response) => {
 
         const user = await prisma.pengguna.findUnique({
             where: { email: validatedData.email },
-            include: { perusahaan: true }
+            include: {
+                aksesPerusahaan: {
+                    where: { isAktif: true },
+                    include: { perusahaan: true }
+                }
+            }
         });
 
-        if (!user || !(await comparePassword(validatedData.password, user.password))) {
+        if (!user) {
+            return res.status(401).json({ message: 'Email atau password salah' });
+        }
+
+        // Check if account is locked
+        if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+            const minutesLeft = Math.ceil((user.lockoutUntil.getTime() - Date.now()) / 60000);
+            return res.status(403).json({
+                message: `Akun terkunci karena terlalu banyak percobaan gagal. Silakan coba lagi dalam ${minutesLeft} menit.`
+            });
+        }
+
+        if (!(await comparePassword(validatedData.password, user.password))) {
+            const failedAttempts = user.failedLoginAttempts + 1;
+            const lockoutUntil = failedAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
+
+            await prisma.pengguna.update({
+                where: { id: user.id },
+                data: {
+                    failedLoginAttempts: failedAttempts,
+                    lockoutUntil
+                }
+            });
+
+            // Log failed attempt
+            const defaultCompanyId = user.aksesPerusahaan?.[0]?.perusahaanId || 'system';
+            await prisma.jejakAudit.create({
+                data: {
+                    perusahaanId: defaultCompanyId,
+                    penggunaId: user.id,
+                    aksi: 'LOGIN_FAILED',
+                    modul: 'AUTH',
+                    namaTabel: 'Pengguna',
+                    idData: user.id,
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent'],
+                    keterangan: `Gagal login (Percobaan ke-${failedAttempts})`
+                }
+            });
+
             return res.status(401).json({ message: 'Email atau password salah' });
         }
 
@@ -110,57 +187,162 @@ export const login = async (req: Request, res: Response) => {
             return res.status(401).json({ message: 'Akun Anda tidak aktif' });
         }
 
+        // Reset failed attempts on success
+        await prisma.pengguna.update({
+            where: { id: user.id },
+            data: {
+                failedLoginAttempts: 0,
+                lockoutUntil: null,
+                lastLogin: new Date()
+            }
+        });
+
         const accessToken = signAccessToken({ id: user.id });
-        const refreshToken = signRefreshToken({ id: user.id });
+        const refreshToken = await signRefreshToken(
+            { id: user.id },
+            req.headers['user-agent'],
+            req.ip || req.socket.remoteAddress
+        );
 
         res.cookie('accessToken', accessToken, accessTokenOptions);
         res.cookie('refreshToken', refreshToken, cookieOptions);
 
-        await prisma.pengguna.update({
-            where: { id: user.id },
-            data: { lastLogin: new Date() }
+        // Log success
+        const activeAkses = user.aksesPerusahaan.find(a => a.isDefault) || user.aksesPerusahaan[0];
+
+        await prisma.jejakAudit.create({
+            data: {
+                perusahaanId: activeAkses?.perusahaanId || 'system',
+                penggunaId: user.id,
+                aksi: 'LOGIN_SUCCESS',
+                modul: 'AUTH',
+                namaTabel: 'Pengguna',
+                idData: user.id,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent']
+            }
         });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password: _, ...userWithoutPassword } = user;
         res.json({
             message: 'Login berhasil',
-            user: userWithoutPassword,
+            user: {
+                ...userWithoutPassword,
+                companies: user.aksesPerusahaan.map(a => ({
+                    id: a.perusahaanId,
+                    nama: a.perusahaan.nama,
+                    role: a.role,
+                    isDefault: a.isDefault
+                }))
+            },
+            currentCompanyId: activeAkses?.perusahaanId,
             accessToken
         });
     } catch (error: unknown) {
         if (error instanceof Error && error.name === 'ZodError') {
-            const zodError = error as unknown as { errors: Array<{ message: string }> };
-            return res.status(400).json({ message: zodError.errors[0].message });
+            const zodError = error as any;
+            const message = zodError.errors?.[0]?.message || 'Email atau password wajib diisi';
+            return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat login' });
     }
 };
 
-export const logout = (_req: Request, res: Response) => {
+export const logout = async (req: Request, res: Response) => {
+    const refreshToken = req.cookies.refreshToken;
+    if (refreshToken) {
+        await revokeRefreshToken(refreshToken);
+    }
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
     res.json({ message: 'Logout berhasil' });
 };
 
-export const getMe = (req: Request, res: Response) => {
+export const getMe = async (req: Request, res: Response) => {
     const authReq = req as AuthRequest;
+
+    // Fetch full user with company list
+    const user = await prisma.pengguna.findUnique({
+        where: { id: authReq.user.id },
+        include: {
+            aksesPerusahaan: {
+                where: { isAktif: true },
+                include: { perusahaan: true }
+            }
+        }
+    });
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...userWithoutPassword } = authReq.user;
-    res.json({ user: userWithoutPassword });
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+        user: {
+            ...userWithoutPassword,
+            companies: user.aksesPerusahaan.map(a => ({
+                id: a.perusahaanId,
+                nama: a.perusahaan.nama,
+                role: a.role,
+                isDefault: a.isDefault
+            }))
+        },
+        activeCompanyId: authReq.currentCompanyId
+    });
+};
+
+export const switchCompany = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const { companyId } = req.body;
+
+        if (!companyId) return res.status(400).json({ message: 'Company ID is required' });
+
+        // Validate access
+        const access = await (prisma as any).aksesPengguna.findUnique({
+            where: {
+                penggunaId_perusahaanId: {
+                    penggunaId: authReq.user.id,
+                    perusahaanId: companyId
+                }
+            },
+            include: { perusahaan: true }
+        });
+
+        if (!access || !access.isAktif) {
+            return res.status(403).json({ message: 'You do not have access to this company' });
+        }
+
+        // Return a bit of info (Frontend can catch this to reload or update state)
+        res.json({
+            message: `Switched to ${access.perusahaan.nama}`,
+            companyId: access.perusahaanId,
+            role: access.role
+        });
+
+    } catch (error) {
+        console.error('Switch Company Error:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
 };
 
 export const refresh = async (req: Request, res: Response) => {
-    const refreshToken = req.cookies.refreshToken;
+    const oldRefreshToken = req.cookies.refreshToken;
 
-    if (!refreshToken) {
+    if (!oldRefreshToken) {
         return res.status(401).json({ message: 'Harap login kembali' });
     }
 
     try {
-        const decoded = verifyRefreshToken(refreshToken) as { id: string } | null;
+        const decoded = await verifyRefreshToken(oldRefreshToken) as { id: string } | null;
         if (!decoded) {
-            return res.status(401).json({ message: 'Sessi telah berakhir, silakan login ulang' });
+            // Potential theft or reuse: revoke all if token exists but is invalid/revoked
+            const stored = await prisma.refreshToken.findUnique({ where: { token: oldRefreshToken } });
+            if (stored) {
+                await revokeAllUserTokens(stored.userId);
+            }
+            return res.status(401).json({ message: 'Sessi telah berakhir atau tidak valid, silakan login ulang' });
         }
 
         const user = await prisma.pengguna.findUnique({ where: { id: decoded.id } });
@@ -168,11 +350,88 @@ export const refresh = async (req: Request, res: Response) => {
             return res.status(401).json({ message: 'Pengguna tidak ditemukan atau tidak aktif' });
         }
 
+        // Token Rotation: Revoke old, issue new
+        await revokeRefreshToken(oldRefreshToken);
+
         const newAccessToken = signAccessToken({ id: user.id });
+        const newRefreshToken = await signRefreshToken(
+            { id: user.id },
+            req.headers['user-agent'],
+            req.ip || req.socket.remoteAddress
+        );
+
         res.cookie('accessToken', newAccessToken, accessTokenOptions);
+        res.cookie('refreshToken', newRefreshToken, cookieOptions);
 
         res.json({ accessToken: newAccessToken });
     } catch {
         return res.status(401).json({ message: 'Refresh token tidak valid' });
+    }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const user = authReq.user;
+        const validatedData = changePasswordSchema.parse(req.body);
+
+        // Verify current password
+        if (!(await comparePassword(validatedData.currentPassword, user.password))) {
+            return res.status(400).json({ message: 'Password saat ini salah' });
+        }
+
+        const newHashedPassword = await hashPassword(validatedData.newPassword);
+
+        // Check password history (last 5)
+        const history = await prisma.passwordHistory.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: 'desc' },
+            take: 5
+        });
+
+        for (const log of history) {
+            if (await comparePassword(validatedData.newPassword, log.password)) {
+                return res.status(400).json({ message: 'Password baru tidak boleh sama dengan 5 password terakhir Anda' });
+            }
+        }
+
+        // Update password and record in history
+        await prisma.$transaction([
+            prisma.pengguna.update({
+                where: { id: user.id },
+                data: {
+                    password: newHashedPassword,
+                    passwordChangedAt: new Date()
+                }
+            }),
+            prisma.passwordHistory.create({
+                data: {
+                    userId: user.id,
+                    password: newHashedPassword
+                }
+            }),
+            prisma.jejakAudit.create({
+                data: {
+                    perusahaanId: authReq.currentCompanyId || 'system',
+                    penggunaId: user.id,
+                    aksi: 'CHANGE_PASSWORD',
+                    modul: 'AUTH',
+                    namaTabel: 'Pengguna',
+                    idData: user.id,
+                    ipAddress: req.ip,
+                    userAgent: req.headers['user-agent'],
+                    keterangan: 'Perubahan password berhasil'
+                }
+            })
+        ]);
+
+        res.json({ message: 'Password berhasil diubah' });
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'ZodError') {
+            const zodError = error as any;
+            const message = zodError.errors?.[0]?.message || 'Kesalahan validasi data';
+            return res.status(400).json({ message });
+        }
+        res.status(500).json({ message: 'Error server saat mengubah password' });
     }
 };

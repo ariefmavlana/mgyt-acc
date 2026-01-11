@@ -38,7 +38,7 @@ const movementSchema = z.object({
     keterangan: z.string().optional(),
     items: z.array(z.object({
         produkId: z.string().min(1, 'Produk wajib'),
-        kuantitas: z.coerce.number().gt(0, 'Qty > 0'),
+        kuantitas: z.number().gt(0, 'Qty > 0'),
     })).min(1, 'Minimal 1 item'),
 });
 
@@ -272,7 +272,12 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                                 render={({ field }) => (
                                     <FormItem className="w-24">
                                         <FormControl>
-                                            <Input type="number" placeholder="Qty" {...field} />
+                                            <Input
+                                                type="number"
+                                                placeholder="Qty"
+                                                value={field.value}
+                                                onChange={e => field.onChange(e.target.valueAsNumber)}
+                                            />
                                         </FormControl>
                                     </FormItem>
                                 )}

@@ -48,22 +48,22 @@ const productFormSchema = z.object({
     satuan: z.string().min(1, 'Satuan harus diisi'),
     isPPN: z.boolean().default(false),
 
-    hargaJualEceran: z.coerce.number().min(0, 'Harga jual harus >= 0'),
-    hargaJualGrosir: z.coerce.number().min(0).optional(),
-    hargaBeli: z.coerce.number().min(0).optional(),
+    hargaJualEceran: z.number().min(0, 'Harga jual harus >= 0'),
+    hargaJualGrosir: z.number().min(0).optional(),
+    hargaBeli: z.number().min(0).optional(),
 
     deskripsiSingkat: z.string().optional(),
     fotoUtama: z.string().optional(),
 
     // Inventory
-    stokMinimum: z.coerce.number().min(0).default(0),
-    stokMaksimum: z.coerce.number().min(0).optional(),
+    stokMinimum: z.number().min(0).default(0),
+    stokMaksimum: z.number().min(0).optional(),
 
     // Variants
     variants: z.array(z.object({
         namaVariant: z.string().min(1, 'Nama varian wajib'),
         sku: z.string().min(1, 'SKU varian wajib'),
-        hargaJual: z.coerce.number().min(0).optional(),
+        hargaJual: z.number().min(0).optional(),
     })).optional()
 });
 
@@ -74,7 +74,7 @@ export function ProductForm() {
     const [activeTab, setActiveTab] = useState("general");
 
     const form = useForm<ProductFormValues>({
-        resolver: zodResolver(productFormSchema),
+        resolver: zodResolver(productFormSchema) as any,
         defaultValues: {
             isPPN: false,
             stokMinimum: 0,
@@ -221,7 +221,7 @@ export function ProductForm() {
                                             <FormItem>
                                                 <FormLabel>Harga Jual</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} />
+                                                    <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -234,7 +234,7 @@ export function ProductForm() {
                                             <FormItem>
                                                 <FormLabel>Harga Beli (Modal)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} />
+                                                    <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -307,7 +307,7 @@ export function ProductForm() {
                                             <FormItem>
                                                 <FormLabel>Stok Minimum Alert</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} />
+                                                    <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                                 </FormControl>
                                                 <FormDescription>Peringatkan jika stok dibawah level ini.</FormDescription>
                                                 <FormMessage />
@@ -321,7 +321,7 @@ export function ProductForm() {
                                             <FormItem>
                                                 <FormLabel>Stok Maksimum (Opsional)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} />
+                                                    <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -379,7 +379,7 @@ export function ProductForm() {
                                                     <FormItem>
                                                         <FormLabel className={index !== 0 ? "sr-only" : ""}>Harga (+/-)</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" placeholder="Opsional" {...field} />
+                                                            <Input type="number" placeholder="Opsional" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>

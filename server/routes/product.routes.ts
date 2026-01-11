@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.middleware';
-import { checkCompanyContext } from '../middleware/company.middleware';
 import {
     getProducts,
     getProduct,
@@ -12,7 +11,6 @@ import {
 const router = Router();
 
 router.use(protect);
-router.use(checkCompanyContext);
 
 router.get('/', getProducts);
 router.post('/', createProduct);

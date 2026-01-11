@@ -148,8 +148,8 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                             <SelectItem value="JURNAL_UMUM">Jurnal Umum</SelectItem>
                                             <SelectItem value="PENJUALAN">Penjualan</SelectItem>
                                             <SelectItem value="PEMBELIAN">Pembelian</SelectItem>
-                                            <SelectItem value="KAS_MASUK">Kas Masuk</SelectItem>
-                                            <SelectItem value="KAS_KELUAR">Kas Keluar</SelectItem>
+                                            <SelectItem value="BIAYA">Biaya</SelectItem>
+                                            <SelectItem value="LAINNYA">Lainnya</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />

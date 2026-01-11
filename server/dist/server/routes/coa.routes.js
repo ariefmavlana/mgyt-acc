@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const coa_controller_1 = require("../controllers/coa.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.protect);
+router.get('/', coa_controller_1.getCOATree);
+router.post('/', coa_controller_1.createCOA);
+router.get('/:id', coa_controller_1.getCOADetail);
+router.put('/:id', coa_controller_1.updateCOA);
+router.delete('/:id', coa_controller_1.deleteCOA);
+router.get('/:id/transactions', coa_controller_1.getAccountLedger);
+router.get('/:id/balance', coa_controller_1.getAccountBalance);
+exports.default = router;

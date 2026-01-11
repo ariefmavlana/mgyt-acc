@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.middleware';
-import { checkCompanyContext } from '../middleware/company.middleware';
 import {
     getBalanceSheet,
     getIncomeStatement,
@@ -11,7 +10,6 @@ import {
 const router = Router();
 
 router.use(protect);
-router.use(checkCompanyContext);
 
 router.get('/balance-sheet', getBalanceSheet);
 router.get('/income-statement', getIncomeStatement);

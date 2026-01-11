@@ -424,3 +424,30 @@ model BackupLog {
     @@index([status])
     @@index([waktuMulai])
 }
+
+model RefreshToken {
+    id       String   @id @default(cuid())
+    token    String   @unique
+    userId   String
+    pengguna Pengguna @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    userAgent String?
+    ipAddress String?
+
+    isRevoked Boolean  @default(false)
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    @@index([userId])
+    @@index([token])
+}
+
+model PasswordHistory {
+    id        String   @id @default(cuid())
+    userId    String
+    pengguna  Pengguna @relation(fields: [userId], references: [id], onDelete: Cascade)
+    password  String
+    createdAt DateTime @default(now())
+
+    @@index([userId])
+}

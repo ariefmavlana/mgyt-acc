@@ -8,7 +8,7 @@ export const getCustomers = async (req: Request, res: Response) => {
         const { search } = req.query;
 
         const where: any = {
-            perusahaanId: authReq.user.perusahaanId,
+            perusahaanId: authReq.currentCompanyId!,
             // You might want a type filter if Pelanggan is just one type of 'Partner'
             // But if 'Pelanggan' is a dedicated model, just query it.
         };
@@ -37,7 +37,8 @@ export const createCustomer = async (req: Request, res: Response) => {
 
         const customer = await prisma.pelanggan.create({
             data: {
-                perusahaanId: authReq.user.perusahaanId,
+                perusahaanId: authReq.currentCompanyId!,
+                kodePelanggan: `CUST-${Date.now()}`,
                 nama,
                 email,
                 telepon,

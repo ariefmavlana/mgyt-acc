@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import prisma from '../../lib/prisma';
-import { Role } from '@prisma/client';
-
-import { Pengguna, Perusahaan } from '@prisma/client';
+import { Pengguna, AksesPengguna, Role } from '@prisma/client';
 
 export interface AuthRequest extends Request {
-    user: Pengguna & { perusahaan: Perusahaan };
+    user: Pengguna;
+    akses?: AksesPengguna;
+    currentCompanyId?: string;
 }
 
 export const protect = async (req: Request, res: Response, next: NextFunction) => {
@@ -30,7 +30,12 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     const currentUser = await prisma.pengguna.findUnique({
         where: { id: decoded.id },
-        include: { perusahaan: true }
+        include: {
+            aksesPerusahaan: {
+                where: { isAktif: true },
+                take: 1
+            }
+        }
     });
 
     if (!currentUser) {
@@ -42,13 +47,20 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     }
 
     authReq.user = currentUser;
+    // Default to the first active company access if available
+    if (currentUser.aksesPerusahaan?.[0]) {
+        authReq.akses = currentUser.aksesPerusahaan[0];
+        authReq.currentCompanyId = currentUser.aksesPerusahaan[0].perusahaanId;
+    }
+
     next();
 };
 
 export const restrictTo = (...roles: Role[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         const authReq = req as AuthRequest;
-        if (!authReq.user || !roles.includes(authReq.user.role)) {
+        // Check role from currently active company context
+        if (!authReq.akses || !roles.includes(authReq.akses.role)) {
             return res.status(403).json({ message: 'Anda tidak memiliki izin untuk melakukan tindakan ini.' });
         }
         next();

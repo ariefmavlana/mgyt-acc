@@ -7,7 +7,7 @@ export const getStock = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { warehouseId, productId } = req.query;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const where: any = {
             persediaan: { perusahaanId }
@@ -40,7 +40,7 @@ export const recordMovement = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const validatedData = stockMovementSchema.parse(req.body);
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
 
         const result = await prisma.$transaction(async (tx) => {
             const results = [];
@@ -99,7 +99,6 @@ export const recordMovement = async (req: Request, res: Response) => {
                             nomorMutasi: `MUT-${Date.now()}`,
                             tanggal: new Date(validatedData.tanggal),
                             tipe: validatedData.tipe === 'TRANSFER' ? 'TRANSFER_OUT' : 'KELUAR',
-                            salesType: 'MANUAL', // Should add this to enum if needed or use 'tipe' field string
                             kuantitas: item.kuantitas,
                             harga: costPrice,
                             nilai: item.kuantitas * costPrice,
@@ -150,7 +149,6 @@ export const recordMovement = async (req: Request, res: Response) => {
                             nomorMutasi: `MUT-${Date.now()}-IN`,
                             tanggal: new Date(validatedData.tanggal),
                             tipe: validatedData.tipe === 'TRANSFER' ? 'TRANSFER_IN' : validatedData.tipe,
-                            salesType: 'MANUAL', // Needs fixing in prisma schema if strict enum, assuming String based on schema view
                             kuantitas: item.kuantitas,
                             harga: costPrice,
                             nilai: item.kuantitas * costPrice,
@@ -179,7 +177,7 @@ export const getMovementHistory = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { page = 1, limit = 20, warehouseId } = req.query;
-        const perusahaanId = authReq.user.perusahaanId;
+        const perusahaanId = authReq.currentCompanyId!;
         const skip = (Number(page) - 1) * Number(limit);
 
         const where: any = {
@@ -210,6 +208,7 @@ export const getMovementHistory = async (req: Request, res: Response) => {
             }
         });
     } catch (error) {
+        console.error('Get Movement Error:', error);
         res.status(500).json({ message: 'Gagal mengambil riwayat mutasi' });
     }
 };

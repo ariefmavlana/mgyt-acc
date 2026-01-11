@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createCompanySchema, TierPaket } from '@/server/validators/company.validator';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 
-type CompanyFormData = z.input<typeof createCompanySchema>;
+type CompanyFormData = z.infer<typeof createCompanySchema>;
 
 interface CompanyFormProps {
     initialData?: Partial<CompanyFormData>;
@@ -21,9 +21,8 @@ interface CompanyFormProps {
 export function CompanyForm({ initialData, onSubmit }: CompanyFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const form = useForm<any>({
-        resolver: zodResolver(createCompanySchema),
+    const form = useForm<CompanyFormData>({
+        resolver: zodResolver(createCompanySchema) as Resolver<CompanyFormData>,
         defaultValues: {
             nama: initialData?.nama || '',
             email: initialData?.email || '',

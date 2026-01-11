@@ -30,6 +30,7 @@ interface COANode {
     namaAkun: string;
     tipe: string;
     isHeader: boolean;
+    totalBalance: number;
     children: COANode[];
     [key: string]: any;
 }

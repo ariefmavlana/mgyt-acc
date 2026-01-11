@@ -42,7 +42,7 @@ export function AgingChart({ data }: AgingChartProps) {
                     tickFormatter={(value) => `Rp${value / 1000}k`}
                 />
                 <Tooltip
-                    formatter={(value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(value)}
+                    formatter={(value: any) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(value))}
                     cursor={{ fill: 'transparent' }}
                 />
                 <Bar dataKey="amount" fill="#adfa1d" radius={[4, 4, 0, 0]} />
