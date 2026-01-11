@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mgyt Akuntansi - Sistem Akuntansi Terintegrasi
 
-## Getting Started
+Mgyt Akuntansi adalah sistem akuntansi modern yang dibangun dengan Next.js dan Express, dirancang untuk memberikan kemudahan dalam pengelolaan keuangan, transaksi, dan data perusahaan secara real-time.
 
-First, run the development server:
+## Fitur Utama
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Unified Architecture**: Frontend (Next.js) dan Backend (Express) berjalan serentak pada port yang sama (3000).
+- **Multi-Company Support**: Kelola banyak perusahaan dalam satu platform.
+- **Transaction Entry System**: Sistem entri transaksi yang valid dan otomatis menghasilkan Jurnal serta Voucher.
+- **Real-time Balance**: Update saldo Chart of Accounts (COA) secara instan setelah transaksi.
+- **Type Safety**: Dibangun dengan TypeScript untuk keamanan kode maksimal.
+- **Modern UI**: Antarmuka responsif menggunakan Tailwind CSS dan komponen Radix UI.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Teknologi Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend**: Next.js 16 (App Router), Tailwind CSS, TanStack Query/Table.
+- **Backend**: Express v5, Prisma ORM.
+- **Database**: PostgreSQL.
+- **Validation**: Zod (Schema sharing antara frontend & backend).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Pengaturan Lokal
 
-## Learn More
+1. **Clone repositori**
+2. **Instal dependensi**:
+   ```bash
+   bun install
+   ```
+3. **Konfigurasi Environment**:
+   Salin `.env.example` menjadi `.env` dan sesuaikan `DATABASE_URL`.
+4. **Sinkronisasi Database**:
+   ```bash
+   bun x prisma db push
+   ```
+5. **Jalankan Server Pengembangan**:
+   ```bash
+   bun dev
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+Aplikasi dapat diakses di [http://localhost:3000](http://localhost:3000). API tersedia di `/api`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Struktur Proyek
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `/app`: Root aplikasi Next.js (Pages & Layouts).
+- `/server`: Logika backend Express (Routes, Controllers, Middleware).
+- `/components`: Komponen UI reusable.
+- `/lib`: Utilitas bersama dan instansi API.
+- `/prisma`: Skema database dan migrasi.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+FATH
