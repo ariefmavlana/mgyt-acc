@@ -1,0 +1,309 @@
+// ============================================================================
+// ENUMS - Indonesian Accounting Standards
+// All enums with @map for database/TypeScript separation
+// ============================================================================
+
+enum Role {
+    SUPERADMIN
+    ADMIN
+    MANAGER
+    STAFF
+    AUDITOR
+    CEO
+    CFO
+    ACCOUNTANT
+    SENIOR_ACCOUNTANT
+    FINANCE_MANAGER
+    CASHIER
+    TAX_OFFICER
+    WAREHOUSE_MANAGER
+    PURCHASING
+    SALES
+}
+
+enum TipeAkun {
+    ASET
+    LIABILITAS
+    EKUITAS
+    PENDAPATAN
+    BEBAN
+    PENDAPATAN_KOMPREHENSIF_LAIN
+}
+
+enum KategoriAset {
+    ASET_LANCAR
+    KAS_DAN_SETARA_KAS
+    PIUTANG_USAHA
+    PERSEDIAAN
+    ASET_TIDAK_LANCAR
+    ASET_TETAP
+    PROPERTI_INVESTASI
+    ASET_TIDAK_BERWUJUD
+    INVESTASI_JANGKA_PANJANG
+    ASET_PAJAK_TANGGUHAN
+}
+
+enum KategoriLiabilitas {
+    LIABILITAS_JANGKA_PENDEK
+    HUTANG_USAHA
+    HUTANG_PAJAK
+    LIABILITAS_JANGKA_PANJANG
+    HUTANG_BANK
+    LIABILITAS_PAJAK_TANGGUHAN
+    LIABILITAS_IMBALAN_KERJA
+}
+
+enum KategoriEkuitas {
+    MODAL_SAHAM
+    TAMBAHAN_MODAL_DISETOR
+    SAHAM_TREASURI
+    SALDO_LABA
+    SALDO_LABA_DITENTUKAN_PENGGUNAANNYA
+    PENDAPATAN_KOMPREHENSIF_LAIN
+    KEPENTINGAN_NON_PENGENDALI
+}
+
+enum TipeTransaksi {
+    JURNAL_UMUM
+    PENJUALAN
+    PEMBELIAN
+    BIAYA
+    GAJI
+    PEMBAYARAN_HUTANG
+    PENERIMAAN_PIUTANG
+    INVESTASI
+    PENYUSUTAN
+    AMORTISASI
+    REVALUASI
+    PENYISIHAN
+    JURNAL_PENYESUAIAN
+    JURNAL_PENUTUP
+    JURNAL_PEMBALIK
+    JURNAL_KOREKSI
+    LAINNYA
+}
+
+enum TipeVoucher {
+    KAS_MASUK
+    KAS_KELUAR
+    BANK_MASUK
+    BANK_KELUAR
+    JURNAL_UMUM
+    JURNAL_MEMORIAL
+    JURNAL_PENYESUAIAN
+    JURNAL_PENUTUP
+    JURNAL_PEMBALIK
+}
+
+enum StatusVoucher {
+    DRAFT
+    MENUNGGU_PERSETUJUAN
+    DISETUJUI
+    DIPOSTING
+    DITOLAK
+    DIBATALKAN
+    REVERSED
+}
+
+enum StatusPembayaran {
+    BELUM_DIBAYAR
+    DIBAYAR_SEBAGIAN
+    LUNAS
+    OVERDUE
+    DIHAPUSBUKUKAN
+}
+
+enum TipePembayaran {
+    TUNAI
+    TRANSFER_BANK
+    CEK
+    GIRO
+    KARTU_KREDIT
+    KARTU_DEBIT
+    VIRTUAL_ACCOUNT
+    E_WALLET
+}
+
+enum StatusAsetTetap {
+    AKTIF
+    DALAM_KONSTRUKSI
+    DALAM_PERBAIKAN
+    IDLE
+    UNTUK_DIJUAL
+    DIJUAL
+    DIHAPUSKAN
+    RUSAK
+}
+
+enum MetodePenyusutan {
+    GARIS_LURUS
+    SALDO_MENURUN
+    SALDO_MENURUN_GANDA
+    JUMLAH_ANGKA_TAHUN
+    UNIT_PRODUKSI
+}
+
+enum MetodePenilaianPersediaan {
+    FIFO
+    RATA_RATA_BERGERAK
+    RATA_RATA_TERTIMBANG
+    IDENTIFIKASI_KHUSUS
+}
+
+enum StatusPersediaan {
+    TERSEDIA
+    DIPESAN
+    DIPINJAM
+    RUSAK
+    KADALUARSA
+    DALAM_TRANSIT
+    DIKEMBALIKAN
+}
+
+enum JenisPajak {
+    PPH_PASAL_21
+    PPH_PASAL_22
+    PPH_PASAL_23
+    PPH_PASAL_25
+    PPH_PASAL_26
+    PPH_PASAL_29
+    PPH_PASAL_4_AYAT_2
+    PPH_PASAL_15
+    PPN_KELUARAN
+    PPN_MASUKAN
+    PBB
+    BPHTB
+    BEA_MATERAI
+    PAJAK_DAERAH
+}
+
+enum StatusFakturPajak {
+    NORMAL
+    PENGGANTI
+    DIBATALKAN
+    GAGAL_UPLOAD
+    APPROVAL_PENDING
+    APPROVED
+    REJECTED
+}
+
+enum TipeLaporan {
+    LAPORAN_POSISI_KEUANGAN
+    LAPORAN_LABA_RUGI
+    LAPORAN_LABA_RUGI_KOMPREHENSIF
+    LAPORAN_PERUBAHAN_EKUITAS
+    LAPORAN_ARUS_KAS
+    CATATAN_ATAS_LAPORAN_KEUANGAN
+    BUKU_BESAR
+    BUKU_PEMBANTU
+    NERACA_SALDO
+    NERACA_LAJUR
+    JURNAL_UMUM
+    KARTU_PIUTANG
+    KARTU_HUTANG
+    KARTU_PERSEDIAAN
+    AGING_SCHEDULE_PIUTANG
+    AGING_SCHEDULE_HUTANG
+    SPT_MASA_PPN
+    SPT_MASA_PPH
+    SPT_TAHUNAN
+    DAFTAR_FAKTUR_PAJAK
+    ANALISIS_RASIO
+    BUDGET_REALIZATION
+    BREAK_EVEN_ANALYSIS
+    CASH_FLOW_PROJECTION
+}
+
+enum PeriodeLaporan {
+    HARIAN
+    MINGGUAN
+    BULANAN
+    KUARTALAN
+    SEMESTERAN
+    TAHUNAN
+    CUSTOM
+}
+
+enum StatusLaporan {
+    DRAFT
+    REVIEW
+    FINAL
+    PUBLISHED
+    REVISED
+    AUDITED
+}
+
+enum TipeBudget {
+    OPERASIONAL
+    MODAL
+    KAS
+    PROYEK
+    DEPARTEMEN
+}
+
+enum StatusBudget {
+    DRAFT
+    SUBMITTED
+    APPROVED
+    AKTIF
+    CLOSED
+    REVISED
+}
+
+enum StatusPeriode {
+    TERBUKA
+    DITUTUP_SEMENTARA
+    DITUTUP_PERMANEN
+}
+
+enum TierPaket {
+    UMKM
+    SMALL
+    MEDIUM
+    ENTERPRISE
+    CUSTOM
+}
+
+enum StatusApproval {
+    PENDING
+    APPROVED
+    REJECTED
+    CANCELLED
+}
+
+enum FrekuensiRekuren {
+    HARIAN
+    MINGGUAN
+    BULANAN
+    KUARTALAN
+    TAHUNAN
+    CUSTOM
+}
+
+enum StatusRekuren {
+    SUCCESS
+    FAILED
+    SKIPPED
+    PENDING
+}
+
+enum KategoriDokumen {
+    INVOICE
+    RECEIPT
+    CONTRACT
+    PURCHASE_ORDER
+    DELIVERY_NOTE
+    TAX_DOCUMENT
+    BANK_STATEMENT
+    SUPPORTING_DOCUMENT
+    LAINNYA
+}
+
+enum TipeWidget {
+    CHART
+    KPI
+    TABLE
+    GAUGE
+    LIST
+    CALENDAR
+}

@@ -1,0 +1,221 @@
+// ============================================================================
+// ORGANIZATION MODULE - Cost Centers & Projects
+// Project costing & departmental tracking
+// ============================================================================
+// Models: CostCenter, ProfitCenter, Departemen, Proyek,
+//         ProyekTransaksi, Kontrak, BankRekening
+// Purpose: Organizational structure & project tracking
+// Use Cases: Project-based businesses, cost center accounting
+// ============================================================================
+
+model CostCenter {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode      String
+    nama      String
+    deskripsi String?
+
+    parent   CostCenter?  @relation("SubCostCenter", fields: [parentId], references: [id])
+    parentId String?
+    children CostCenter[] @relation("SubCostCenter")
+
+    manager String?
+
+    isAktif Boolean @default(true)
+
+    transaksi     Transaksi[]
+    voucherDetail VoucherDetail[]
+    jurnalDetail  JurnalDetail[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId])
+}
+
+model ProfitCenter {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode      String
+    nama      String
+    deskripsi String?
+
+    parent   ProfitCenter?  @relation("SubProfitCenter", fields: [parentId], references: [id])
+    parentId String?
+    children ProfitCenter[] @relation("SubProfitCenter")
+
+    manager String?
+
+    isAktif Boolean @default(true)
+
+    transaksi     Transaksi[]
+    voucherDetail VoucherDetail[]
+    jurnalDetail  JurnalDetail[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId])
+}
+
+// ============================================================================
+// CONTRACTS & BANKING
+// ============================================================================
+
+model Kontrak {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    nomorKontrak String
+    namaKontrak  String
+
+    pihakKedua String
+
+    tanggalMulai DateTime
+    tanggalAkhir DateTime
+
+    nilaiKontrak Decimal @db.Decimal(25, 2)
+
+    jenis  String
+    status String @default("AKTIF")
+
+    deskripsi String?
+
+    transaksi Transaksi[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, nomorKontrak])
+    @@index([perusahaanId, status])
+}
+
+model BankRekening {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode          String
+    namaBank      String
+    nomorRekening String
+    atasNama      String
+
+    cabang String?
+    swift  String?
+
+    mataUang String @default("IDR")
+
+    saldoAwal     Decimal @default(0) @db.Decimal(25, 2)
+    saldoBerjalan Decimal @default(0) @db.Decimal(25, 2)
+
+    isAktif Boolean @default(true)
+
+    catatan String?
+
+    pembayaran Pembayaran[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId])
+    @@index([nomorRekening])
+}
+
+// ============================================================================
+// HUMAN RESOURCES
+// ============================================================================
+
+model Departemen {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode String
+    nama String
+
+    parent   Departemen?  @relation("DepartemenHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+    parentId String?
+    children Departemen[] @relation("DepartemenHierarchy")
+
+    kepala    String?
+    deskripsi String?
+    isAktif   Boolean @default(true)
+
+    budgets       Budget[]       @relation("BudgetToDepartemen")
+    budgetDetails BudgetDetail[] @relation("BudgetDetailToDepartemen")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId])
+    @@index([parentId])
+}
+
+model Proyek {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodeProyek String
+    namaProyek String
+
+    pelanggan   Pelanggan? @relation(fields: [pelangganId], references: [id])
+    pelangganId String?
+
+    tanggalMulai   DateTime
+    tanggalSelesai DateTime?
+    targetSelesai  DateTime?
+
+    nilaiKontrak    Decimal? @db.Decimal(25, 2)
+    totalBiaya      Decimal  @default(0) @db.Decimal(25, 2)
+    totalPendapatan Decimal  @default(0) @db.Decimal(25, 2)
+
+    status            String  @default("ACTIVE")
+    persentaseSelesai Decimal @default(0) @db.Decimal(5, 2)
+
+    manajerProyek String?
+    lokasi        String?
+    deskripsi     String?
+
+    proyekTransaksi ProyekTransaksi[]
+    budgets         Budget[]          @relation("BudgetToProyek")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodeProyek])
+    @@index([perusahaanId, status])
+    @@index([pelangganId])
+}
+
+model ProyekTransaksi {
+    id       String @id @default(cuid())
+    proyek   Proyek @relation(fields: [proyekId], references: [id])
+    proyekId String
+
+    transaksi   Transaksi @relation("TransaksiToProyekTransaksi", fields: [transaksiId], references: [id], onDelete: Restrict)
+    transaksiId String
+
+    akun   ChartOfAccounts? @relation("ProyekTransaksiToAkun", fields: [akunId], references: [id], onDelete: Restrict)
+    akunId String?
+
+    jumlah        Decimal @db.Decimal(25, 2)
+    tipeTransaksi String
+    keterangan    String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([proyekId])
+    @@index([transaksiId])
+    @@index([akunId])
+}

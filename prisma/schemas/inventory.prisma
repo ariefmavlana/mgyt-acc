@@ -1,0 +1,219 @@
+// ============================================================================
+// INVENTORY MODULE - Stock Management
+// Perpetual inventory system with multi-warehouse
+// ============================================================================
+// Models: Gudang, Persediaan, StokPersediaan, MutasiPersediaan,
+//         Produk, ProdukVariant, ProdukBundle, TransaksiPersediaan
+// Purpose: Inventory tracking, product catalog, stock movements
+// Methods: FIFO, LIFO, Weighted Average
+// ============================================================================
+
+model Gudang {
+    id       String @id @default(cuid())
+    cabang   Cabang @relation(fields: [cabangId], references: [id])
+    cabangId String
+
+    kode   String
+    nama   String
+    alamat String?
+
+    penanggungJawab String?
+    telepon         String?
+
+    isUtama Boolean @default(false)
+    isAktif Boolean @default(true)
+
+    stokPersediaan   StokPersediaan[]
+    mutasiPersediaan MutasiPersediaan[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([cabangId, kode])
+    @@index([cabangId])
+}
+
+model Persediaan {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodePersediaan String
+    namaPersediaan String
+    kategori       String
+
+    satuan  String
+    barcode String?
+    sku     String?
+
+    hargaBeli   Decimal  @db.Decimal(18, 2)
+    hargaJual   Decimal  @db.Decimal(18, 2)
+    hargaGrosir Decimal? @db.Decimal(18, 2)
+
+    metode MetodePenilaianPersediaan @default(RATA_RATA_BERGERAK)
+
+    stokMinimum  Decimal  @default(0) @db.Decimal(18, 4)
+    stokMaksimum Decimal? @db.Decimal(18, 4)
+
+    supplier   Pemasok? @relation(fields: [supplierId], references: [id])
+    supplierId String?
+
+    isPajakPPN Boolean @default(false)
+
+    status StatusPersediaan @default(TERSEDIA)
+
+    deskripsi   String?
+    spesifikasi String?
+    fotoProduk  String?
+
+    stok            StokPersediaan[]
+    mutasi          MutasiPersediaan[]
+    transaksiDetail TransaksiDetail[]
+    produk          Produk?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodePersediaan])
+    @@index([perusahaanId, kategori])
+    @@index([barcode])
+}
+
+model StokPersediaan {
+    id           String     @id @default(cuid())
+    persediaan   Persediaan @relation(fields: [persediaanId], references: [id])
+    persediaanId String
+
+    gudang   Gudang @relation(fields: [gudangId], references: [id])
+    gudangId String
+
+    kuantitas         Decimal @default(0) @db.Decimal(18, 4)
+    kuantitasDipesan  Decimal @default(0) @db.Decimal(18, 4)
+    kuantitasReserved Decimal @default(0) @db.Decimal(18, 4)
+
+    nilaiStok     Decimal @default(0) @db.Decimal(25, 2)
+    hargaRataRata Decimal @default(0) @db.Decimal(18, 2)
+
+    updatedAt DateTime @updatedAt
+
+    @@unique([persediaanId, gudangId])
+    @@index([gudangId])
+}
+
+model MutasiPersediaan {
+    id           String     @id @default(cuid())
+    persediaan   Persediaan @relation(fields: [persediaanId], references: [id])
+    persediaanId String
+
+    gudang   Gudang @relation(fields: [gudangId], references: [id])
+    gudangId String
+
+    nomorMutasi String
+    tanggal     DateTime
+    tipe        String // "MASUK", "KELUAR", "TRANSFER", "ADJUSTMENT"
+
+    referensi String?
+
+    kuantitas Decimal @db.Decimal(18, 4)
+    harga     Decimal @db.Decimal(18, 2)
+    nilai     Decimal @db.Decimal(25, 2)
+
+    saldoSebelum Decimal @db.Decimal(18, 4)
+    saldoSesudah Decimal @db.Decimal(18, 4)
+
+    gudangTujuan String?
+
+    keterangan String?
+
+    createdAt DateTime @default(now())
+
+    @@index([persediaanId, tanggal])
+    @@index([gudangId])
+    @@index([nomorMutasi])
+}
+
+// ============================================================================
+// PARTNERS (CUSTOMERS & SUPPLIERS)
+// ============================================================================
+
+model Produk {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    persediaan   Persediaan? @relation(fields: [persediaanId], references: [id])
+    persediaanId String?     @unique
+
+    kodeProduk  String
+    namaProduk  String
+    kategori    String
+    subKategori String?
+
+    hargaJualEceran Decimal  @db.Decimal(18, 2)
+    hargaJualGrosir Decimal? @db.Decimal(18, 2)
+    hargaBeli       Decimal? @db.Decimal(18, 2)
+
+    isPPN  Boolean @default(false)
+    satuan String
+
+    deskripsiSingkat String?
+    fotoUtama        String?
+
+    isAktif Boolean @default(true)
+
+    variant             ProdukVariant[]
+    transaksiPersediaan TransaksiPersediaan[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodeProduk])
+    @@index([perusahaanId, kategori])
+    @@index([isAktif])
+}
+
+model ProdukVariant {
+    id       String @id @default(cuid())
+    produk   Produk @relation(fields: [produkId], references: [id], onDelete: Cascade)
+    produkId String
+
+    namaVariant String
+    sku         String   @unique
+    hargaJual   Decimal? @db.Decimal(18, 2)
+
+    atribut Json?
+    isAktif Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([produkId])
+}
+
+model TransaksiPersediaan {
+    id String @id @default(cuid())
+
+    produk   Produk @relation(fields: [produkId], references: [id])
+    produkId String
+
+    voucher   Voucher? @relation("VoucherToTransaksiPersediaan", fields: [voucherId], references: [id], onDelete: Restrict)
+    voucherId String?
+
+    tipe    String
+    tanggal DateTime
+
+    kuantitas   Decimal @db.Decimal(18, 4)
+    hargaSatuan Decimal @db.Decimal(18, 2)
+    total       Decimal @db.Decimal(25, 2)
+
+    referensi  String?
+    keterangan String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([produkId])
+    @@index([voucherId])
+    @@index([tanggal])
+    @@index([tipe])
+}

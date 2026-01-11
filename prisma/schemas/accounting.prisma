@@ -1,0 +1,414 @@
+// ============================================================================
+// ACCOUNTING MODULE - Double-Entry Bookkeeping
+// PSAK-compliant accounting engine
+// ============================================================================
+// Models: ChartOfAccounts, Transaksi, TransaksiDetail, Pembayaran,
+//         Voucher, VoucherDetail, JurnalUmum, JurnalDetail, PeriodeAkuntansi
+// Purpose: Core accounting transactions & general ledger
+// Flow: Transaksi → Voucher → Jurnal → ChartOfAccounts
+// ============================================================================
+
+model ChartOfAccounts {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodeAkun String
+    namaAkun String
+
+    tipe               TipeAkun
+    kategoriAset       KategoriAset?
+    kategoriLiabilitas KategoriLiabilitas?
+    kategoriEkuitas    KategoriEkuitas?
+
+    level    Int               @default(1)
+    parent   ChartOfAccounts?  @relation("SubAkun", fields: [parentId], references: [id])
+    parentId String?
+    children ChartOfAccounts[] @relation("SubAkun")
+
+    normalBalance String @default("DEBIT")
+
+    isHeader         Boolean @default(false)
+    isActive         Boolean @default(true)
+    isControlAccount Boolean @default(false)
+
+    allowManualEntry  Boolean @default(true)
+    requireDepartment Boolean @default(false)
+    requireProject    Boolean @default(false)
+    requireCostCenter Boolean @default(false)
+
+    multiCurrency   Boolean @default(false)
+    mataUangDefault String?
+
+    saldoAwal       Decimal @default(0) @db.Decimal(25, 2)
+    saldoAwalDebit  Decimal @default(0) @db.Decimal(25, 2)
+    saldoAwalKredit Decimal @default(0) @db.Decimal(25, 2)
+
+    saldoBerjalan Decimal @default(0) @db.Decimal(25, 2)
+
+    pajakId String?
+
+    catatan String?
+
+    jurnalDetail    JurnalDetail[]
+    transaksiDetail TransaksiDetail[]
+    budgetDetail    BudgetDetail[]
+
+    createdAt        DateTime          @default(now())
+    updatedAt        DateTime          @updatedAt
+    voucherDetails   VoucherDetail[]
+    proyekTransaksis ProyekTransaksi[] @relation("ProyekTransaksiToAkun")
+
+    @@unique([perusahaanId, kodeAkun])
+    @@index([perusahaanId, tipe])
+    @@index([kodeAkun])
+    @@index([parentId])
+}
+
+// ============================================================================
+// TRANSACTIONS
+// ============================================================================
+
+model Transaksi {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    cabang   Cabang? @relation(fields: [cabangId], references: [id])
+    cabangId String?
+
+    pengguna   Pengguna @relation(fields: [penggunaId], references: [id])
+    penggunaId String
+
+    nomorTransaksi String
+    tanggal        DateTime
+    tipe           TipeTransaksi
+
+    mataUang   MataUang? @relation(fields: [mataUangId], references: [id])
+    mataUangId String?
+    kurs       Decimal?  @db.Decimal(18, 6)
+
+    pelanggan   Pelanggan? @relation(fields: [pelangganId], references: [id])
+    pelangganId String?
+
+    pemasok   Pemasok? @relation(fields: [pemasokId], references: [id])
+    pemasokId String?
+
+    referensi String?
+    deskripsi String?
+
+    subtotal   Decimal @default(0) @db.Decimal(25, 2)
+    diskon     Decimal @default(0) @db.Decimal(25, 2)
+    pajakId    String?
+    nilaiPajak Decimal @default(0) @db.Decimal(25, 2)
+
+    total          Decimal @db.Decimal(25, 2)
+    totalDibayar   Decimal @default(0) @db.Decimal(25, 2)
+    sisaPembayaran Decimal @default(0) @db.Decimal(25, 2)
+
+    statusPembayaran StatusPembayaran @default(BELUM_DIBAYAR)
+
+    tanggalJatuhTempo DateTime?
+    termPembayaran    Int?
+
+    costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
+    costCenterId String?
+
+    profitCenter   ProfitCenter? @relation(fields: [profitCenterId], references: [id])
+    profitCenterId String?
+
+    kontrak   Kontrak? @relation(fields: [kontrakId], references: [id])
+    kontrakId String?
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+    postedBy String?
+
+    isVoid     Boolean   @default(false)
+    voidAt     DateTime?
+    voidBy     String?
+    voidReason String?
+
+    detail         TransaksiDetail[]
+    pembayaran     Pembayaran[]
+    pajak          TransaksiPajak[]
+    voucher        Voucher?
+    dokumen        DokumenTransaksi[]
+    rekurenHistory RiwayatTransaksiRekuren[]
+
+    createdAt        DateTime          @default(now())
+    updatedAt        DateTime          @updatedAt
+    budgetRealisasis BudgetRealisasi[] @relation("BudgetRealisasiToTransaksi")
+    proyekTransaksis ProyekTransaksi[] @relation("TransaksiToProyekTransaksi")
+    piutangs         Piutang[]
+    hutangs          Hutang[]
+
+    @@unique([perusahaanId, nomorTransaksi])
+    @@index([perusahaanId, tanggal])
+    @@index([perusahaanId, tanggal, tipe])
+    @@index([pelangganId])
+    @@index([pemasokId])
+    @@index([statusPembayaran])
+    @@index([referensi])
+    @@index([tanggalJatuhTempo])
+}
+
+model TransaksiDetail {
+    id          String    @id @default(cuid())
+    transaksi   Transaksi @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
+    transaksiId String
+
+    urutan Int
+
+    akun   ChartOfAccounts @relation(fields: [akunId], references: [id])
+    akunId String
+
+    deskripsi String?
+
+    kuantitas   Decimal @default(1) @db.Decimal(18, 4)
+    hargaSatuan Decimal @db.Decimal(25, 2)
+    diskon      Decimal @default(0) @db.Decimal(25, 2)
+
+    persediaan   Persediaan? @relation(fields: [persediaanId], references: [id])
+    persediaanId String?
+
+    asetTetap   AsetTetap? @relation(fields: [asetTetapId], references: [id])
+    asetTetapId String?
+
+    subtotal Decimal @db.Decimal(25, 2)
+
+    catatan String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([transaksiId])
+    @@index([akunId])
+    @@index([persediaanId])
+}
+
+model Pembayaran {
+    id          String    @id @default(cuid())
+    transaksi   Transaksi @relation(fields: [transaksiId], references: [id])
+    transaksiId String
+
+    nomorPembayaran String
+    tanggal         DateTime
+
+    tipePembayaran TipePembayaran
+    jumlah         Decimal        @db.Decimal(25, 2)
+
+    bankRekening   BankRekening? @relation(fields: [bankRekeningId], references: [id])
+    bankRekeningId String?
+
+    nomorReferensi String?
+
+    kurs       Decimal? @db.Decimal(18, 6)
+    jumlahAsli Decimal? @db.Decimal(25, 2)
+
+    biayaAdmin Decimal @default(0) @db.Decimal(18, 2)
+
+    keterangan String?
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([transaksiId])
+    @@index([tanggal])
+    @@index([nomorPembayaran])
+}
+
+// ============================================================================
+// VOUCHER & JOURNAL
+// ============================================================================
+
+model Voucher {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    nomorVoucher String
+    tanggal      DateTime
+    tipe         TipeVoucher
+
+    transaksi   Transaksi? @relation(fields: [transaksiId], references: [id])
+    transaksiId String?    @unique
+
+    deskripsi String
+
+    totalDebit  Decimal @default(0) @db.Decimal(25, 2)
+    totalKredit Decimal @default(0) @db.Decimal(25, 2)
+
+    status StatusVoucher @default(DRAFT)
+
+    dibuatOleh   Pengguna @relation(fields: [dibuatOlehId], references: [id])
+    dibuatOlehId String
+
+    disetujuiOleh    String?
+    tanggalDisetujui DateTime?
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+    postedBy String?
+
+    isReversed        Boolean   @default(false)
+    reversedAt        DateTime?
+    reversedBy        String?
+    reversedVoucher   Voucher?  @relation("VoucherReversal", fields: [reversedVoucherId], references: [id])
+    reversedVoucherId String?
+    originalVoucher   Voucher[] @relation("VoucherReversal")
+
+    catatan  String?
+    lampiran String?
+
+    detail   VoucherDetail[]
+    approval ApprovalFlow[]
+    jurnal   JurnalUmum[]
+    dokumen  DokumenTransaksi[]
+
+    createdAt            DateTime              @default(now())
+    updatedAt            DateTime              @updatedAt
+    transaksiPersediaans TransaksiPersediaan[] @relation("VoucherToTransaksiPersediaan")
+    pembayaranPiutangs   PembayaranPiutang[]   @relation("VoucherToPembayaranPiutang")
+    pembayaranHutangs    PembayaranHutang[]    @relation("VoucherToPembayaranHutang")
+
+    @@unique([perusahaanId, nomorVoucher])
+    @@index([perusahaanId, tanggal])
+    @@index([status])
+    @@index([tipe])
+}
+
+model VoucherDetail {
+    id        String  @id @default(cuid())
+    voucher   Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+    voucherId String
+
+    urutan Int
+    akun   ChartOfAccounts @relation(fields: [akunId], references: [id])
+    akunId String
+
+    deskripsi String?
+
+    debit  Decimal @default(0) @db.Decimal(25, 2)
+    kredit Decimal @default(0) @db.Decimal(25, 2)
+
+    costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
+    costCenterId String?
+
+    profitCenter   ProfitCenter? @relation(fields: [profitCenterId], references: [id])
+    profitCenterId String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([voucherId])
+    @@index([akunId])
+}
+
+model JurnalUmum {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    periode   PeriodeAkuntansi @relation(fields: [periodeId], references: [id])
+    periodeId String
+
+    voucher   Voucher? @relation(fields: [voucherId], references: [id])
+    voucherId String?
+
+    nomorJurnal String
+    tanggal     DateTime
+
+    deskripsi String
+
+    totalDebit  Decimal @default(0) @db.Decimal(25, 2)
+    totalKredit Decimal @default(0) @db.Decimal(25, 2)
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+
+    isClosed Boolean   @default(false)
+    closedAt DateTime?
+
+    detail JurnalDetail[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, nomorJurnal])
+    @@index([perusahaanId, tanggal])
+    @@index([periodeId])
+}
+
+model JurnalDetail {
+    id       String     @id @default(cuid())
+    jurnal   JurnalUmum @relation(fields: [jurnalId], references: [id], onDelete: Cascade)
+    jurnalId String
+
+    urutan Int
+
+    akun   ChartOfAccounts @relation(fields: [akunId], references: [id])
+    akunId String
+
+    deskripsi String?
+
+    debit  Decimal @default(0) @db.Decimal(25, 2)
+    kredit Decimal @default(0) @db.Decimal(25, 2)
+
+    saldoSebelum Decimal @default(0) @db.Decimal(25, 2)
+    saldoSesudah Decimal @default(0) @db.Decimal(25, 2)
+
+    costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
+    costCenterId String?
+
+    profitCenter   ProfitCenter? @relation(fields: [profitCenterId], references: [id])
+    profitCenterId String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([akunId, createdAt])
+    @@index([jurnalId])
+    @@index([akunId])
+    @@index([debit, kredit])
+}
+
+// ============================================================================
+// PERIOD MANAGEMENT
+// ============================================================================
+
+model PeriodeAkuntansi {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    tahun Int
+    bulan Int
+
+    nama         String
+    tanggalMulai DateTime
+    tanggalAkhir DateTime
+
+    status StatusPeriode @default(TERBUKA)
+
+    ditutupOleh    String?
+    tanggalDitutup DateTime?
+
+    dibukaPada DateTime?
+    dibukaOleh String?
+
+    jurnal JurnalUmum[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, tahun, bulan])
+    @@index([perusahaanId, status])
+}
+
+// ============================================================================
+// ASSETS MANAGEMENT
+// ============================================================================

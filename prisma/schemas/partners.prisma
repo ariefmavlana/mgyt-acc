@@ -1,0 +1,242 @@
+// ============================================================================
+// PARTNERS MODULE - AR/AP Management
+// Customer & supplier management with payment tracking
+// ============================================================================
+// Models: Pelanggan, Pemasok, Piutang, PembayaranPiutang,
+//         Hutang, PembayaranHutang
+// Purpose: Receivables & payables management
+// Features: Aging schedule, payment terms, multi-currency
+// ============================================================================
+
+model Pelanggan {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodePelanggan  String
+    nama           String
+    namaPerusahaan String?
+
+    tipe String @default("INDIVIDUAL")
+
+    alamat   String?
+    kota     String?
+    provinsi String?
+    kodePos  String?
+
+    telepon String?
+    email   String?
+    website String?
+
+    npwp String?
+    nik  String?
+
+    kontakPerson  String?
+    teleponKontak String?
+
+    batasKredit    Decimal @default(0) @db.Decimal(18, 2)
+    termPembayaran Int     @default(30)
+
+    kategori String?
+    grup     String?
+
+    salesPerson String?
+
+    isAktif Boolean @default(true)
+    catatan String?
+
+    transaksi Transaksi[]
+    proyek    Proyek[]
+    piutang   Piutang[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodePelanggan])
+    @@index([perusahaanId, nama])
+    @@index([email])
+}
+
+model Pemasok {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodePemasok    String
+    nama           String
+    namaPerusahaan String?
+
+    alamat   String?
+    kota     String?
+    provinsi String?
+    kodePos  String?
+
+    telepon String?
+    email   String?
+    website String?
+
+    npwp String?
+
+    kontakPerson  String?
+    teleponKontak String?
+
+    batasKredit    Decimal @default(0) @db.Decimal(18, 2)
+    termPembayaran Int     @default(30)
+
+    kategori String?
+
+    nomorRekening String?
+    namaBank      String?
+    atasNama      String?
+
+    isAktif Boolean @default(true)
+    catatan String?
+
+    transaksi  Transaksi[]
+    persediaan Persediaan[]
+    asetTetap  AsetTetap[]
+    hutang     Hutang[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodePemasok])
+    @@index([perusahaanId, nama])
+    @@index([email])
+}
+
+// ============================================================================
+// TAX MANAGEMENT
+// ============================================================================
+
+// ============================================================================
+// AR/AP MODELS - Account Receivables & Payables
+// ============================================================================
+
+model Piutang {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    pelanggan   Pelanggan @relation(fields: [pelangganId], references: [id])
+    pelangganId String
+
+    transaksi   Transaksi? @relation(fields: [transaksiId], references: [id])
+    transaksiId String?
+
+    nomorPiutang      String
+    tanggalPiutang    DateTime
+    tanggalJatuhTempo DateTime
+
+    jumlahPiutang Decimal @db.Decimal(18, 2)
+    jumlahDibayar Decimal @default(0) @db.Decimal(18, 2)
+    sisaPiutang   Decimal @db.Decimal(18, 2)
+
+    statusPembayaran StatusPembayaran @default(BELUM_DIBAYAR)
+
+    keterangan String?
+
+    pembayaran PembayaranPiutang[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, nomorPiutang])
+    @@index([perusahaanId, statusPembayaran])
+    @@index([pelangganId])
+    @@index([transaksiId])
+    @@index([tanggalJatuhTempo])
+}
+
+model PembayaranPiutang {
+    id        String  @id @default(cuid())
+    piutang   Piutang @relation(fields: [piutangId], references: [id])
+    piutangId String
+
+    voucher   Voucher? @relation("VoucherToPembayaranPiutang", fields: [voucherId], references: [id], onDelete: Restrict)
+    voucherId String?
+
+    tanggalBayar DateTime
+    jumlahBayar  Decimal  @db.Decimal(18, 2)
+
+    mataUang   MataUang @relation("MataUangToPembayaranPiutang", fields: [mataUangId], references: [id], onDelete: Restrict)
+    mataUangId String
+
+    kurs       Decimal? @db.Decimal(18, 6)
+    jumlahAsli Decimal? @db.Decimal(18, 2)
+
+    tipePembayaran TipePembayaran
+    nomorReferensi String?
+    keterangan     String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([piutangId])
+    @@index([voucherId])
+    @@index([tanggalBayar])
+}
+
+model Hutang {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    pemasok   Pemasok @relation(fields: [pemasokId], references: [id])
+    pemasokId String
+
+    transaksi   Transaksi? @relation(fields: [transaksiId], references: [id])
+    transaksiId String?
+
+    nomorHutang       String
+    tanggalHutang     DateTime
+    tanggalJatuhTempo DateTime
+
+    jumlahHutang  Decimal @db.Decimal(18, 2)
+    jumlahDibayar Decimal @default(0) @db.Decimal(18, 2)
+    sisaHutang    Decimal @db.Decimal(18, 2)
+
+    statusPembayaran StatusPembayaran @default(BELUM_DIBAYAR)
+
+    keterangan String?
+
+    pembayaran PembayaranHutang[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, nomorHutang])
+    @@index([perusahaanId, statusPembayaran])
+    @@index([pemasokId])
+    @@index([transaksiId])
+    @@index([tanggalJatuhTempo])
+}
+
+model PembayaranHutang {
+    id       String @id @default(cuid())
+    hutang   Hutang @relation(fields: [hutangId], references: [id])
+    hutangId String
+
+    voucher   Voucher? @relation("VoucherToPembayaranHutang", fields: [voucherId], references: [id], onDelete: Restrict)
+    voucherId String?
+
+    tanggalBayar DateTime
+    jumlahBayar  Decimal  @db.Decimal(18, 2)
+
+    mataUang   MataUang @relation("MataUangToPembayaranHutang", fields: [mataUangId], references: [id], onDelete: Restrict)
+    mataUangId String
+
+    kurs       Decimal? @db.Decimal(18, 6)
+    jumlahAsli Decimal? @db.Decimal(18, 2)
+
+    tipePembayaran TipePembayaran
+    nomorReferensi String?
+    keterangan     String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([hutangId])
+    @@index([voucherId])
+    @@index([tanggalBayar])
+}

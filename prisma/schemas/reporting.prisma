@@ -1,0 +1,110 @@
+// ============================================================================
+// REPORTING MODULE - Financial Reports & Dashboards
+// ============================================================================
+// Models: Laporan, TemplateLaporan, DashboardWidget
+// Purpose: Financial statements & custom reports
+// Reports: Balance Sheet, P&L, Cash Flow, Custom
+// ============================================================================
+
+model Laporan {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    dibuatOleh   Pengguna @relation(fields: [dibuatOlehId], references: [id])
+    dibuatOlehId String
+
+    kode String
+    nama String
+    tipe TipeLaporan
+
+    periode      PeriodeLaporan
+    tanggalMulai DateTime
+    tanggalAkhir DateTime
+
+    status StatusLaporan @default(DRAFT)
+
+    format     String  @default("pdf")
+    urlFile    String?
+    ukuranFile Int?
+
+    parameter Json?
+    filter    Json?
+
+    useTemplate Boolean @default(true)
+    templateId  String?
+    customQuery String?
+
+    deskripsi String?
+    catatan   String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId, tipe])
+    @@index([tanggalMulai, tanggalAkhir])
+}
+
+model TemplateLaporan {
+    id String @id @default(cuid())
+
+    kode     String      @unique
+    nama     String
+    tipe     TipeLaporan
+    kategori String?
+
+    deskripsi String?
+    query     String?
+    parameter Json?
+    format    Json?
+
+    isPublic Boolean @default(true)
+    aktif    Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([tipe])
+}
+
+// ============================================================================
+// DASHBOARD & ANALYTICS
+// ============================================================================
+
+model DashboardWidget {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    pengguna   Pengguna @relation(fields: [penggunaId], references: [id])
+    penggunaId String
+
+    nama     String
+    tipe     TipeWidget
+    kategori String? // "FINANCIAL", "SALES", "INVENTORY", "HR"
+
+    query       String?
+    dataSource  Json? // {"type": "api", "endpoint": "/api/..."}
+    konfigurasi Json // Chart config, colors, size, etc
+
+    posisi Int // Grid position
+    lebar  Int @default(4) // Grid width (1-12)
+    tinggi Int @default(3) // Grid height
+
+    refreshInterval Int? // in seconds, null = manual only
+
+    isAktif  Boolean @default(true)
+    isPublik Boolean @default(false) // Shared with other users
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, penggunaId, nama])
+    @@index([perusahaanId, penggunaId])
+    @@index([kategori])
+}
+
+// ============================================================================
+// SYSTEM & AUDIT
+// ============================================================================

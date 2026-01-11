@@ -1,0 +1,426 @@
+// ============================================================================
+// SYSTEM MODULE - Infrastructure & Audit
+// ============================================================================
+// Models: Notifikasi, JejakAudit, SistemSetting, BackupLog,
+//         TransaksiRekuren, RiwayatTransaksiRekuren,
+//         ApprovalTemplate, ApprovalLevel, ApprovalFlow, DokumenTransaksi
+// Purpose: System management, audit trail, workflow
+// ============================================================================
+
+model AsetTetap {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodeAset String
+    namaAset String
+    kategori String
+
+    tanggalPerolehan DateTime
+    nilaiPerolehan   Decimal  @db.Decimal(25, 2)
+
+    supplier   Pemasok? @relation(fields: [supplierId], references: [id])
+    supplierId String?
+
+    metodePenyusutan MetodePenyusutan
+    umurEkonomis     Int
+    nilaiResidu      Decimal          @default(0) @db.Decimal(25, 2)
+
+    akumulasiPenyusutan Decimal @default(0) @db.Decimal(25, 2)
+    nilaiBuku           Decimal @db.Decimal(25, 2)
+
+    lokasi          String?
+    departemen      String?
+    penanggungJawab String?
+
+    nomorSeri   String?
+    merk        String?
+    model       String?
+    spesifikasi String?
+
+    status StatusAsetTetap @default(AKTIF)
+
+    tanggalPenjualan DateTime?
+    nilaiPenjualan   Decimal?  @db.Decimal(25, 2)
+
+    catatan  String?
+    fotoAset String?
+
+    penyusutan      PenyusutanAset[]
+    transaksiDetail TransaksiDetail[]
+    dokumen         DokumenTransaksi[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodeAset])
+    @@index([perusahaanId, kategori])
+    @@index([status])
+}
+
+model PenyusutanAset {
+    id          String    @id @default(cuid())
+    asetTetap   AsetTetap @relation(fields: [asetTetapId], references: [id])
+    asetTetapId String
+
+    periode DateTime
+    bulan   Int
+    tahun   Int
+
+    nilaiAwal       Decimal @db.Decimal(25, 2)
+    bebanPenyusutan Decimal @db.Decimal(25, 2)
+    akumulasi       Decimal @db.Decimal(25, 2)
+    nilaiBuku       Decimal @db.Decimal(25, 2)
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+
+    createdAt DateTime @default(now())
+
+    @@unique([asetTetapId, periode])
+    @@index([asetTetapId, tahun, bulan])
+}
+
+model AsetTidakBerwujud {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodeAset String
+    namaAset String
+    jenis    String
+
+    tanggalPerolehan DateTime
+    nilaiPerolehan   Decimal  @db.Decimal(25, 2)
+
+    umurManfaat Int
+    nilaiResidu Decimal @default(0) @db.Decimal(25, 2)
+
+    akumulasiAmortisasi Decimal @default(0) @db.Decimal(25, 2)
+    nilaiBuku           Decimal @db.Decimal(25, 2)
+
+    nomorHakPaten String?
+    masaBerlaku   DateTime?
+
+    catatan String?
+
+    amortisasi AmortisasiAset[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodeAset])
+    @@index([perusahaanId, jenis])
+}
+
+model AmortisasiAset {
+    id                  String            @id @default(cuid())
+    asetTidakBerwujud   AsetTidakBerwujud @relation(fields: [asetTidakBerwujudId], references: [id])
+    asetTidakBerwujudId String
+
+    periode DateTime
+    bulan   Int
+    tahun   Int
+
+    nilaiAwal       Decimal @db.Decimal(25, 2)
+    bebanAmortisasi Decimal @db.Decimal(25, 2)
+    akumulasi       Decimal @db.Decimal(25, 2)
+    nilaiBuku       Decimal @db.Decimal(25, 2)
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+
+    createdAt DateTime @default(now())
+
+    @@unique([asetTidakBerwujudId, periode])
+    @@index([asetTidakBerwujudId, tahun, bulan])
+}
+
+// ============================================================================
+// INVENTORY MANAGEMENT
+// ============================================================================
+
+model TransaksiRekuren {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode String
+    nama String
+    tipe TipeTransaksi
+
+    templateTransaksi Json // Template data transaksi
+
+    frekuensi      FrekuensiRekuren
+    intervalHari   Int?
+    hariDalamBulan Int? // untuk bulanan: 1-31, 99=akhir bulan
+    tanggalMulai   DateTime
+    tanggalAkhir   DateTime?
+
+    tanggalExekusiBerikutnya DateTime
+
+    isAktif     Boolean @default(true)
+    autoPosting Boolean @default(false)
+
+    jumlahEksekusi Int @default(0)
+    jumlahBerhasil Int @default(0)
+    jumlahGagal    Int @default(0)
+
+    notifikasiEmail Boolean @default(true)
+    emailTujuan     String?
+
+    catatan String?
+
+    riwayat RiwayatTransaksiRekuren[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId, isAktif])
+    @@index([tanggalExekusiBerikutnya])
+}
+
+model RiwayatTransaksiRekuren {
+    id        String           @id @default(cuid())
+    rekuren   TransaksiRekuren @relation(fields: [rekurenId], references: [id])
+    rekurenId String
+
+    transaksi   Transaksi? @relation(fields: [transaksiId], references: [id])
+    transaksiId String?
+
+    tanggalDijadwalkan DateTime
+    tanggalDiproses    DateTime?
+    status             StatusRekuren
+    errorMessage       String?
+
+    dataTransaksi Json?
+
+    createdAt DateTime @default(now())
+
+    @@index([rekurenId])
+    @@index([tanggalDijadwalkan])
+    @@index([status])
+}
+
+// ============================================================================
+// APPROVAL WORKFLOW
+// ============================================================================
+
+model ApprovalTemplate {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    modul     String // "VOUCHER", "INVOICE", "PAYMENT", "PURCHASE_ORDER"
+    nama      String
+    deskripsi String?
+
+    rules Json // Kondisi threshold: {"amount": {">": 1000000}}
+
+    isAktif   Boolean @default(true)
+    isDefault Boolean @default(false)
+
+    levels ApprovalLevel[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, modul, nama])
+    @@index([perusahaanId, modul])
+}
+
+model ApprovalLevel {
+    id         String           @id @default(cuid())
+    template   ApprovalTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+    templateId String
+
+    level Int
+    nama  String
+
+    approverRoles Json // Array of roles: ["CFO", "FINANCE_MANAGER"]
+    minApprover   Int  @default(1)
+
+    kondisi   Json? // Optional conditions
+    isParalel Boolean @default(false)
+
+    timeoutHari Int? // Auto-escalate after X days
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([templateId, level])
+    @@index([templateId])
+}
+
+model ApprovalFlow {
+    id String @id @default(cuid())
+
+    modul    String
+    recordId String
+
+    level      Int
+    approver   Pengguna @relation(fields: [approverId], references: [id])
+    approverId String
+
+    status  StatusApproval @default(PENDING)
+    tanggal DateTime?
+    catatan String?
+
+    voucher   Voucher? @relation(fields: [voucherId], references: [id])
+    voucherId String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([modul, recordId])
+    @@index([approverId, status])
+    @@index([voucherId])
+}
+
+// ============================================================================
+// DOCUMENT MANAGEMENT
+// ============================================================================
+
+model DokumenTransaksi {
+    id String @id @default(cuid())
+
+    transaksi   Transaksi? @relation(fields: [transaksiId], references: [id])
+    transaksiId String?
+
+    voucher   Voucher? @relation(fields: [voucherId], references: [id])
+    voucherId String?
+
+    asetTetap   AsetTetap? @relation(fields: [asetTetapId], references: [id])
+    asetTetapId String?
+
+    nama       String
+    jenisFile  String // "pdf", "jpg", "png", "xlsx"
+    ukuranFile Int // in bytes
+    urlFile    String
+
+    kategori  KategoriDokumen @default(LAINNYA)
+    deskripsi String?
+
+    uploadedBy   Pengguna @relation(fields: [uploadedById], references: [id])
+    uploadedById String
+
+    isPublik Boolean @default(false)
+    tags     String? // comma-separated tags
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([transaksiId])
+    @@index([voucherId])
+    @@index([asetTetapId])
+    @@index([kategori])
+    @@index([uploadedById])
+}
+
+// ============================================================================
+// REPORTING
+// ============================================================================
+
+model Notifikasi {
+    id         String   @id @default(cuid())
+    pengguna   Pengguna @relation(fields: [penggunaId], references: [id])
+    penggunaId String
+
+    judul    String
+    pesan    String
+    tipe     String // "INFO", "WARNING", "ERROR", "SUCCESS"
+    kategori String? // "APPROVAL", "PAYMENT", "SYSTEM"
+
+    referensiId String?
+    urlAction   String?
+
+    dibaca        Boolean   @default(false)
+    tanggalDibaca DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([penggunaId, dibaca])
+    @@index([kategori])
+    @@index([createdAt])
+}
+
+model JejakAudit {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    pengguna   Pengguna? @relation(fields: [penggunaId], references: [id])
+    penggunaId String?
+
+    aksi     String // "CREATE", "UPDATE", "DELETE", "VIEW", "APPROVE", "POST"
+    modul    String
+    subModul String?
+
+    namaTabel String
+    idData    String
+
+    dataSebelum Json?
+    dataSesudah Json?
+    perubahan   Json? // Diff of changes
+
+    ipAddress String?
+    userAgent String?
+    lokasi    String?
+
+    keterangan String?
+
+    createdAt DateTime @default(now())
+
+    @@index([perusahaanId, namaTabel, idData])
+    @@index([penggunaId])
+    @@index([createdAt])
+    @@index([modul, subModul])
+    @@index([aksi])
+}
+
+model SistemSetting {
+    id String @id @default(cuid())
+
+    kategori String
+    kunci    String
+    nilai    String
+
+    tipeData     String  @default("string") // "string", "number", "boolean", "json"
+    deskripsi    String?
+    defaultValue String?
+    validasiRule String?
+
+    isPublik    Boolean @default(false)
+    isSensitive Boolean @default(false) // Encrypt value
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([kategori, kunci])
+    @@index([kategori])
+}
+
+model BackupLog {
+    id String @id @default(cuid())
+
+    namaFile String
+    ukuran   BigInt
+    lokasi   String
+
+    tipe       String  @default("FULL") // "FULL", "INCREMENTAL", "DIFFERENTIAL"
+    status     String // "SUCCESS", "FAILED", "IN_PROGRESS"
+    pesanError String?
+
+    waktuMulai   DateTime
+    waktuSelesai DateTime?
+    durasi       Int? // in seconds
+
+    dibuatOleh String?
+
+    createdAt DateTime @default(now())
+
+    @@index([status])
+    @@index([waktuMulai])
+}

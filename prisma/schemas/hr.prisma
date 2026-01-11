@@ -1,0 +1,89 @@
+// ============================================================================
+// HR MODULE - Payroll & Employee Management
+// ============================================================================
+// Models: Karyawan, Penggajian
+// Purpose: Employee data & payroll processing
+// Features: PPh 21 calculation, BPJS integration
+// ============================================================================
+
+model Karyawan {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    nik          String
+    nama         String
+    tempatLahir  String?
+    tanggalLahir DateTime?
+    jenisKelamin String?
+
+    alamat  String?
+    kota    String?
+    telepon String?
+    email   String?
+
+    ktp                 String?
+    npwp                String?
+    bpjsKesehatan       String?
+    bpjsKetenagakerjaan String?
+
+    tanggalMasuk  DateTime
+    tanggalKeluar DateTime?
+    status        String    @default("AKTIF")
+    departemen    String?
+    jabatan       String?
+    level         String?
+
+    gajiPokok    Decimal @db.Decimal(18, 2)
+    bankNama     String?
+    bankRekening String?
+
+    catatan String?
+
+    penggajian Penggajian[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, nik])
+    @@index([perusahaanId])
+    @@index([nama])
+}
+
+model Penggajian {
+    id         String   @id @default(cuid())
+    karyawan   Karyawan @relation(fields: [karyawanId], references: [id])
+    karyawanId String
+
+    periode      String
+    tanggalBayar DateTime
+
+    gajiPokok Decimal @db.Decimal(18, 2)
+    tunjangan Decimal @default(0) @db.Decimal(18, 2)
+    lembur    Decimal @default(0) @db.Decimal(18, 2)
+    bonus     Decimal @default(0) @db.Decimal(18, 2)
+
+    totalPenghasilan Decimal @db.Decimal(18, 2)
+
+    potonganBpjs    Decimal @default(0) @db.Decimal(18, 2)
+    potonganPph21   Decimal @default(0) @db.Decimal(18, 2)
+    potonganLainnya Decimal @default(0) @db.Decimal(18, 2)
+
+    totalPotongan Decimal @db.Decimal(18, 2)
+
+    netto Decimal @db.Decimal(18, 2)
+
+    keterangan    String?
+    sudahDibayar  Boolean @default(false)
+    sudahDijurnal Boolean @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([karyawanId, periode])
+    @@index([periode])
+}
+
+// ============================================================================
+// BUDGETING
+// ============================================================================

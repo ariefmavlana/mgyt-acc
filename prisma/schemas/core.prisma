@@ -1,0 +1,250 @@
+// ============================================================================
+// CORE MODULE - Company & User Management
+// Foundation models for multi-company, multi-branch, multi-user
+// ============================================================================
+// Models: Perusahaan, PengaturanPerusahaan, Cabang, Pengguna, MataUang, KursHistory
+// Purpose: Company setup, user management, multi-currency
+// ============================================================================
+
+model MataUang {
+    id           String @id @default(cuid())
+    kode         String @unique // "IDR", "USD", "SGD", "EUR"
+    nama         String
+    simbol       String
+    desimalDigit Int    @default(2)
+
+    negara String?
+
+    isAktif   Boolean @default(true)
+    isDefault Boolean @default(false)
+
+    kursHistory        KursHistory[]
+    transaksi          Transaksi[]
+    pembayaranPiutangs PembayaranPiutang[] @relation("MataUangToPembayaranPiutang")
+    pembayaranHutangs  PembayaranHutang[]  @relation("MataUangToPembayaranHutang")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([kode, isAktif])
+}
+
+model KursHistory {
+    id         String   @id @default(cuid())
+    mataUang   MataUang @relation(fields: [mataUangId], references: [id])
+    mataUangId String
+
+    tanggal  DateTime
+    kurs     Decimal  @db.Decimal(18, 6) // Kurs tengah
+    kursBeli Decimal? @db.Decimal(18, 6)
+    kursJual Decimal? @db.Decimal(18, 6)
+
+    sumber String? // "BI", "Manual", "API_XE", "API_CURRENCYAPI"
+
+    createdAt DateTime @default(now())
+
+    @@unique([mataUangId, tanggal])
+    @@index([mataUangId])
+    @@index([tanggal])
+}
+
+// ============================================================================
+// CORE MODELS
+// ============================================================================
+
+model Perusahaan {
+    id          String  @id @default(cuid())
+    kode        String  @unique
+    nama        String
+    namaLengkap String?
+    bentukUsaha String?
+    bidangUsaha String?
+    alamat      String?
+    kelurahan   String?
+    kecamatan   String?
+    kota        String?
+    provinsi    String?
+    kodePos     String?
+    telepon     String?
+    fax         String?
+    email       String?
+    website     String?
+
+    npwp          String?
+    nib           String?
+    aktaPendirian String?
+    skKemenkumham String?
+
+    logo             String?
+    mataUangUtama    String  @default("IDR")
+    tahunBuku        Int     @default(12)
+    satuanUsahaKecil Boolean @default(false)
+
+    induk   Perusahaan?  @relation("GrupPerusahaan", fields: [indukId], references: [id])
+    indukId String?
+    anak    Perusahaan[] @relation("GrupPerusahaan")
+
+    cabang            Cabang[]
+    pengguna          Pengguna[]
+    coa               ChartOfAccounts[]
+    transaksi         Transaksi[]
+    voucher           Voucher[]
+    jurnal            JurnalUmum[]
+    asetTetap         AsetTetap[]
+    asetTidakBerwujud AsetTidakBerwujud[]
+    persediaan        Persediaan[]
+    pajak             MasterPajak[]
+    pelanggan         Pelanggan[]
+    pemasok           Pemasok[]
+    karyawan          Karyawan[]
+    costCenter        CostCenter[]
+    profitCenter      ProfitCenter[]
+    kontrak           Kontrak[]
+    bankRekening      BankRekening[]
+    laporan           Laporan[]
+    budget            Budget[]
+    periode           PeriodeAkuntansi[]
+    pengaturan        PengaturanPerusahaan?
+    jejakAudit        JejakAudit[]
+    paket             PerusahaanPaket[]
+    approvalTemplates ApprovalTemplate[]
+    transaksiRekuren  TransaksiRekuren[]
+    dashboardWidgets  DashboardWidget[]
+
+    produk       Produk[]
+    departemen   Departemen[]
+    proyek       Proyek[]
+    piutang      Piutang[]
+    hutang       Hutang[]
+    fakturPajak  FakturPajak[]
+    laporanPajak LaporanPajak[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([kode])
+    @@index([npwp])
+}
+
+model PengaturanPerusahaan {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id], onDelete: Cascade)
+    perusahaanId String     @unique
+
+    metodeAkuntansi  String                    @default("ACCRUAL")
+    metodeInventory  MetodePenilaianPersediaan @default(RATA_RATA_BERGERAK)
+    metodePenyusutan MetodePenyusutan          @default(GARIS_LURUS)
+    metodAmortisasi  MetodePenyusutan          @default(GARIS_LURUS)
+
+    batasKreditDefault    Decimal @default(0) @db.Decimal(18, 2)
+    termPembayaranDefault Int     @default(30)
+
+    permitEditTransaksiPosted   Boolean @default(false)
+    permitDeleteTransaksiPosted Boolean @default(false)
+    requireApprovalVoucher      Boolean @default(true)
+    requireApprovalPembayaran   Boolean @default(true)
+
+    autoNumberingVoucher Boolean @default(true)
+    formatNomorVoucher   String  @default("[PREFIX]-[YEAR][MONTH]-[SEQUENCE]")
+
+    autoNumberingInvoice Boolean @default(true)
+    formatNomorInvoice   String  @default("INV-[YEAR][MONTH]-[SEQUENCE]")
+
+    useMultiCurrency  Boolean @default(false)
+    useMultiWarehouse Boolean @default(false)
+    useCostCenter     Boolean @default(false)
+    useProfitCenter   Boolean @default(false)
+    useProjectCosting Boolean @default(false)
+    useBudgeting      Boolean @default(false)
+
+    notifikasiEmail    Boolean @default(true)
+    notifikasiWhatsapp Boolean @default(false)
+
+    backupOtomatis   Boolean @default(true)
+    frekuensiBackup  String  @default("HARIAN")
+    retensiBukuBesar Int     @default(7) // tahun
+
+    integrasiPajak Boolean @default(false)
+    apiKeyEfaktur  String?
+    apiKeyEbupot   String?
+
+    logoKopSurat     String?
+    templateKopSurat Json?
+
+    customSettings Json?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Cabang {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode    String
+    nama    String
+    alamat  String?
+    kota    String?
+    telepon String?
+    email   String?
+
+    kepala   String?
+    isAktif  Boolean @default(true)
+    isKantor Boolean @default(false)
+
+    pengguna  Pengguna[]
+    transaksi Transaksi[]
+    gudang    Gudang[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId])
+}
+
+model Pengguna {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    cabang   Cabang? @relation(fields: [cabangId], references: [id])
+    cabangId String?
+
+    username String @unique
+    email    String @unique
+    password String
+
+    namaLengkap String
+    role        Role   @default(STAFF)
+
+    foto    String?
+    telepon String?
+
+    isAktif       Boolean   @default(true)
+    emailVerified Boolean   @default(false)
+    lastLogin     DateTime?
+
+    aksesModul  Json? // {"inventory": true, "payroll": false}
+    permissions Json? // custom permissions
+
+    voucher          Voucher[]
+    transaksi        Transaksi[]
+    laporan          Laporan[]
+    approval         ApprovalFlow[]
+    notifikasi       Notifikasi[]
+    jejakAudit       JejakAudit[]
+    dashboardWidgets DashboardWidget[]
+    uploadedDocs     DokumenTransaksi[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([perusahaanId])
+    @@index([email])
+}
+
+// ============================================================================
+// CHART OF ACCOUNTS
+// ============================================================================

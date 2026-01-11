@@ -1,0 +1,14 @@
+// ============================================================================
+// INDONESIAN ACCOUNTING SYSTEM - PRISMA 7 MAIN SCHEMA
+// PSAK Compliant | Production Ready | Multi-Tier Architecture
+// Version: 3.0 | Prisma 7 | January 2026
+// ============================================================================
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    // Database URL configured in prisma.config.ts (Prisma 7 requirement)
+}

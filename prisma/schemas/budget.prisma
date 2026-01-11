@@ -1,0 +1,123 @@
+// ============================================================================
+// BUDGET MODULE - Budget Planning & Control
+// Budget vs Actual with variance analysis
+// ============================================================================
+// Models: Budget, BudgetDetail, BudgetRevisi, BudgetRealisasi
+// Purpose: Budget planning, tracking, and analysis
+// Features: Multi-level approval, variance alerts
+// ============================================================================
+
+model Budget {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kode  String
+    nama  String
+    tahun Int
+    tipe  TipeBudget
+
+    tanggalMulai DateTime
+    tanggalAkhir DateTime
+
+    totalBudget         Decimal @default(0) @db.Decimal(25, 2)
+    totalRealisasi      Decimal @default(0) @db.Decimal(25, 2)
+    totalVariance       Decimal @default(0) @db.Decimal(25, 2)
+    persentaseRealisasi Decimal @default(0) @db.Decimal(5, 2)
+
+    status StatusBudget @default(DRAFT)
+
+    departemenName String?
+    projectCode    String?
+    deskripsi      String?
+
+    disetujuiOleh    String?
+    tanggalDisetujui DateTime?
+
+    detail     BudgetDetail[]
+    revisi     BudgetRevisi[]
+    realisasi  BudgetRealisasi[]
+    departemen Departemen?       @relation("BudgetToDepartemen", fields: [departemenId], references: [id])
+    proyek     Proyek?           @relation("BudgetToProyek", fields: [proyekId], references: [id])
+
+    departemenId String?
+    proyekId     String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kode])
+    @@index([perusahaanId, tahun])
+    @@index([status])
+}
+
+model BudgetDetail {
+    id       String @id @default(cuid())
+    budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+    budgetId String
+
+    akun   ChartOfAccounts @relation(fields: [akunId], references: [id])
+    akunId String
+
+    periode DateTime
+    bulan   Int
+
+    jumlahBudget       Decimal @db.Decimal(25, 2)
+    jumlahRealisasi    Decimal @default(0) @db.Decimal(25, 2)
+    variance           Decimal @default(0) @db.Decimal(25, 2)
+    variancePersentase Decimal @default(0) @db.Decimal(5, 2)
+
+    keterangan String?
+
+    createdAt    DateTime    @default(now())
+    updatedAt    DateTime    @updatedAt
+    departemen   Departemen? @relation("BudgetDetailToDepartemen", fields: [departemenId], references: [id])
+    departemenId String?
+
+    @@unique([budgetId, akunId, periode])
+    @@index([budgetId])
+    @@index([akunId])
+}
+
+model BudgetRevisi {
+    id       String @id @default(cuid())
+    budget   Budget @relation(fields: [budgetId], references: [id])
+    budgetId String
+
+    versi         Int
+    tanggalRevisi DateTime
+    alasanRevisi  String
+
+    jumlahSebelum Decimal @db.Decimal(25, 2)
+    jumlahSesudah Decimal @db.Decimal(25, 2)
+
+    direvisiOleh String
+    catatan      String?
+
+    createdAt DateTime @default(now())
+
+    @@index([budgetId])
+}
+
+// ============================================================================
+// RECURRING TRANSACTIONS
+// ============================================================================
+
+model BudgetRealisasi {
+    id       String @id @default(cuid())
+    budget   Budget @relation(fields: [budgetId], references: [id])
+    budgetId String
+
+    transaksi   Transaksi? @relation("BudgetRealisasiToTransaksi", fields: [transaksiId], references: [id], onDelete: Restrict)
+    transaksiId String?
+
+    bulan      Int
+    jumlah     Decimal @db.Decimal(25, 2)
+    persentase Decimal @default(0) @db.Decimal(5, 2)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([budgetId, bulan])
+    @@index([transaksiId])
+}

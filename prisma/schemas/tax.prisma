@@ -1,0 +1,133 @@
+// ============================================================================
+// TAX MODULE - Indonesian Tax Compliance
+// DJP e-Faktur integration ready
+// ============================================================================
+// Models: MasterPajak, TransaksiPajak, FakturPajak, LaporanPajak
+// Purpose: Tax calculation & reporting (PPh, PPN, etc)
+// Compliance: DJP e-Faktur, SPT Masa
+// ============================================================================
+
+model MasterPajak {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodePajak String
+    namaPajak String
+    jenis     JenisPajak
+
+    tarif Decimal @db.Decimal(5, 2)
+
+    akunPajak String?
+
+    isAktif    Boolean @default(true)
+    isPemungut Boolean @default(false)
+
+    keterangan String?
+
+    transaksiPajak TransaksiPajak[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodePajak])
+    @@index([perusahaanId, jenis])
+}
+
+model TransaksiPajak {
+    id          String    @id @default(cuid())
+    transaksi   Transaksi @relation(fields: [transaksiId], references: [id])
+    transaksiId String
+
+    pajak   MasterPajak @relation(fields: [pajakId], references: [id])
+    pajakId String
+
+    dasar  Decimal @db.Decimal(25, 2)
+    tarif  Decimal @db.Decimal(5, 2)
+    jumlah Decimal @db.Decimal(25, 2)
+
+    nomorFaktur   String?
+    tanggalFaktur DateTime?
+
+    statusFaktur StatusFakturPajak?
+
+    isCreditable Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    fakturPajak FakturPajak[] @relation("TransaksiPajakToFakturPajak")
+
+    @@index([transaksiId])
+    @@index([pajakId])
+    @@index([nomorFaktur])
+}
+
+// ============================================================================
+// COST & PROFIT CENTER
+// ============================================================================
+
+model FakturPajak {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    transaksiPajak   TransaksiPajak @relation("TransaksiPajakToFakturPajak", fields: [transaksiPajakId], references: [id], onDelete: Restrict)
+    transaksiPajakId String
+
+    nomorSeri     String   @unique
+    tanggalFaktur DateTime
+
+    dpp   Decimal @db.Decimal(18, 2)
+    ppn   Decimal @db.Decimal(18, 2)
+    ppnBm Decimal @default(0) @db.Decimal(18, 2)
+
+    namaLawanTransaksi   String
+    npwpLawanTransaksi   String?
+    alamatLawanTransaksi String?
+
+    status StatusFakturPajak @default(NORMAL)
+
+    isUploaded    Boolean   @default(false)
+    uploadedAt    DateTime?
+    nomorApproval String?
+
+    fakturPengganti String?
+    alasanPengganti String?
+
+    keterangan String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([perusahaanId, tanggalFaktur])
+    @@index([transaksiPajakId])
+    @@index([status])
+    @@index([isUploaded])
+}
+
+model LaporanPajak {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    jenisPajak String
+    masaPajak  Int
+    tahunPajak Int
+
+    statusLaporan String    @default("DRAFT")
+    tanggalLapor  DateTime?
+
+    nomorBuktiPenerimaan String?
+
+    dpp   Decimal @default(0) @db.Decimal(18, 2)
+    pajak Decimal @default(0) @db.Decimal(18, 2)
+
+    dokumen String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, jenisPajak, masaPajak, tahunPajak])
+    @@index([perusahaanId, statusLaporan])
+}

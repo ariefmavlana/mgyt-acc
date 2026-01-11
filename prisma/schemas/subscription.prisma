@@ -1,0 +1,90 @@
+// ============================================================================
+// SUBSCRIPTION & FEATURES MODULE
+// Multi-tier pricing system (UMKM/Business/Enterprise)
+// ============================================================================
+// Models: PaketFitur, FiturModul, PerusahaanPaket
+// Purpose: Feature gating & subscription management
+// ============================================================================
+
+model PaketFitur {
+    id        String    @id @default(cuid())
+    kode      String    @unique
+    nama      String
+    deskripsi String?
+    tier      TierPaket
+
+    hargaBulanan Decimal? @db.Decimal(18, 2)
+    hargaTahunan Decimal? @db.Decimal(18, 2)
+
+    maxUser              Int?
+    maxTransaksiPerBulan Int?
+    maxStorageGB         Int?
+    maxCabang            Int?
+    maxPerusahaan        Int? // untuk grup perusahaan
+
+    fiturAktif Json? // {"multi_currency": true, "approval": true}
+
+    isPublik Boolean @default(true)
+    isAktif  Boolean @default(true)
+
+    fitur      FiturModul[]
+    perusahaan PerusahaanPaket[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([tier, isAktif])
+}
+
+model FiturModul {
+    id      String      @id @default(cuid())
+    paket   PaketFitur? @relation(fields: [paketId], references: [id])
+    paketId String?
+
+    kodeModul String // "INVENTORY", "FIXED_ASSETS", "PAYROLL", "MULTI_CURRENCY"
+    namaModul String
+    deskripsi String?
+
+    isAktif Boolean @default(true)
+
+    batasUser      Int?
+    batasTransaksi Int? // per bulan
+    batasData      Int? // storage limit in MB
+
+    fiturTambahan Json? // {"export_excel": true, "api_access": false}
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([paketId, kodeModul])
+    @@index([kodeModul])
+}
+
+model PerusahaanPaket {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    paket   PaketFitur @relation(fields: [paketId], references: [id])
+    paketId String
+
+    tanggalMulai DateTime
+    tanggalAkhir DateTime?
+    isAktif      Boolean   @default(true)
+
+    autoRenewal Boolean @default(false)
+    isTrial     Boolean @default(false)
+
+    customFitur Json? // override fitur untuk custom package
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, paketId, tanggalMulai])
+    @@index([perusahaanId, isAktif])
+    @@index([tanggalAkhir])
+}
+
+// ============================================================================
+// MULTI-CURRENCY MANAGEMENT
+// ============================================================================
