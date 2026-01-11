@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
 import { Prisma } from '@prisma/client';
+import { calculateBPJS, calculatePPh21 } from '../utils/payroll.utils';
 
 /**
  * Get all employees for the current company
@@ -78,7 +79,7 @@ export const getEmployeeById = async (req: Request, res: Response) => {
         const { id } = req.params;
 
         const employee = await prisma.karyawan.findFirst({
-            where: { id, perusahaanId }
+            where: { id: String(id), perusahaanId }
         });
 
         if (!employee) {
@@ -106,7 +107,7 @@ export const updateEmployee = async (req: Request, res: Response) => {
         const data = req.body;
 
         const employee = await prisma.karyawan.findFirst({
-            where: { id, perusahaanId }
+            where: { id: String(id), perusahaanId }
         });
 
         if (!employee) {
@@ -114,10 +115,11 @@ export const updateEmployee = async (req: Request, res: Response) => {
         }
 
         const updated = await prisma.karyawan.update({
-            where: { id },
+            where: { id: String(id) },
             data: {
                 ...data,
-                gajiPokok: data.gajiPokok ? new Prisma.Decimal(data.gajiPokok) : undefined
+                gajiPokok: data.gajiPokok ? new Prisma.Decimal(data.gajiPokok) : undefined,
+                statusPernikahan: data.statusPernikahan // Allow update
             }
         });
 
@@ -202,15 +204,22 @@ export const generatePayroll = async (req: Request, res: Response) => {
 
             if (existing) continue;
 
-            // Simple Calculation (Placeholder for complex logic)
             const salary = Number(emp.gajiPokok);
-            // Example: fixed 2% JP, 1% JK... just using placeholder logic
-            const bpjsCost = salary * 0.03;
-            const pph21Cost = salary * 0.05; // Simplified tax
+            const tunjangan = 0; // Placeholder for now, can be fetched if added to model
+            const bonus = 0;
+            const grossIncome = salary + tunjangan + bonus;
 
-            const totalIncome = salary;
-            const totalDeduction = bpjsCost + pph21Cost;
-            const net = totalIncome - totalDeduction;
+            // 1. Calculate BPJS (Employee Share)
+            // Note: In real world, BPJS basis might differ (Gaji Pokok vs Total), assuming Gaji Pokok here
+            const { bpjsKesehatan, bpjsKetenagakerjaan } = calculateBPJS(salary);
+            const totalBpjsEmployee = bpjsKesehatan + bpjsKetenagakerjaan;
+
+            // 2. Calculate PPh 21 (TER) based on Gross Income
+            // Using statusPernikahan from employee record ("TK/0" default)
+            const pph21 = calculatePPh21(grossIncome, emp.statusPernikahan || 'TK/0');
+
+            const totalDeduction = totalBpjsEmployee + pph21;
+            const net = grossIncome - totalDeduction;
 
             const payroll = await prisma.penggajian.create({
                 data: {
@@ -218,17 +227,17 @@ export const generatePayroll = async (req: Request, res: Response) => {
                     periode: period,
                     tanggalBayar: new Date(date || new Date()),
                     gajiPokok: new Prisma.Decimal(salary),
-                    tunjangan: new Prisma.Decimal(0),
+                    tunjangan: new Prisma.Decimal(tunjangan),
                     lembur: new Prisma.Decimal(0),
-                    bonus: new Prisma.Decimal(0),
-                    totalPenghasilan: new Prisma.Decimal(totalIncome),
-                    potonganBpjs: new Prisma.Decimal(bpjsCost),
-                    potonganPph21: new Prisma.Decimal(pph21Cost),
+                    bonus: new Prisma.Decimal(bonus),
+                    totalPenghasilan: new Prisma.Decimal(grossIncome),
+                    potonganBpjs: new Prisma.Decimal(totalBpjsEmployee),
+                    potonganPph21: new Prisma.Decimal(pph21),
                     potonganLainnya: new Prisma.Decimal(0),
                     totalPotongan: new Prisma.Decimal(totalDeduction),
                     netto: new Prisma.Decimal(net),
-                    status: 'DRAFT' // Assuming we might add status field or handle with boolean 'sudahBayar'
-                } as any // Bypass strict typing for dynamic decimal calc if needed
+                    status: 'DRAFT'
+                } as any
             });
             payrolls.push(payroll);
         }

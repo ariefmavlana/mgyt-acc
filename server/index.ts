@@ -25,7 +25,11 @@ import periodRoutes from './routes/period.routes';
 import importRoutes from './routes/import.routes';
 import purchaseRoutes from './routes/purchase.routes';
 import hrRoutes from './routes/hr.routes';
+import documentRoutes from './routes/documents.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
+import { auditLog } from './middleware/audit.middleware';
+import auditRoutes from './routes/audit.routes';
 import { protect } from './middleware/auth.middleware';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -130,6 +134,13 @@ nextApp.prepare().then(() => {
     app.use('/api/import', protect, tenantMiddleware, importRoutes);
     app.use('/api/purchases', protect, tenantMiddleware, purchaseRoutes);
     app.use('/api/hr', protect, tenantMiddleware, hrRoutes);
+    app.use('/api/documents', protect, tenantMiddleware, documentRoutes);
+    app.use('/api/dashboard', protect, tenantMiddleware, dashboardRoutes);
+    app.use('/api/system/audit', protect, tenantMiddleware, auditRoutes);
+
+    // Global Audit Log Middleware (After Auth & Tenant, apply to all modify routes)
+    // We can apply it globally or specific routes. Let's apply globally after tenant for simplicity
+    app.use('/api', protect, tenantMiddleware, auditLog);
 
     // Health Check
     app.get('/api/health', (req: Request, res: Response) => {

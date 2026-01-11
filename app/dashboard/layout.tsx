@@ -15,7 +15,9 @@ import {
     Menu,
     X,
     ChevronRight,
-    FolderTree
+    FolderTree,
+    Package,
+    ArrowRightLeft
 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -32,6 +34,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const menuItems = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Perusahaan', href: '/dashboard/companies', icon: Building2 },
+        { name: 'Persediaan', href: '/dashboard/inventory', icon: Package },
+        { name: 'Transfer Stok', href: '/dashboard/inventory/transfer', icon: ArrowRightLeft },
         { name: 'Buku Besar', href: '/dashboard/coa', icon: FolderTree },
         { name: 'Transaksi', href: '/dashboard/transactions', icon: FileText },
         { name: 'Laporan', href: '/dashboard/reports', icon: FileText },

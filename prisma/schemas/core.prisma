@@ -105,24 +105,26 @@ model Perusahaan {
     bankRekening      BankRekening[]
     laporan           Laporan[]
     budget            Budget[]
-    periode           PeriodeAkuntansi[]
-    pengaturan        PengaturanPerusahaan?
-    jejakAudit        JejakAudit[]
-    paket             PerusahaanPaket[]
-    approvalTemplates ApprovalTemplate[]
-    transaksiRekuren  TransaksiRekuren[]
-    dashboardWidgets  DashboardWidget[]
+    departemen        Departemen[]
+    proyek            Proyek[]
+    piutang           Piutang[]
+    hutang            Hutang[]
+    fakturPajak       FakturPajak[]
+    laporanPajak      LaporanPajak[]
 
-    produk       Produk[]
-    departemen   Departemen[]
-    proyek       Proyek[]
-    piutang      Piutang[]
-    hutang       Hutang[]
-    fakturPajak  FakturPajak[]
-    laporanPajak LaporanPajak[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    createdAt            DateTime              @default(now())
+    updatedAt            DateTime              @updatedAt
+    roles                Role[]
+    undanganPenggunas    UndanganPengguna[]
+    periodeAkuntansis    PeriodeAkuntansi[]
+    pengaturanPerusahaan PengaturanPerusahaan?
+    transaksiRekurens    TransaksiRekuren[]
+    approvalTemplates    ApprovalTemplate[]
+    jejakAudits          JejakAudit[]
+    produks              Produk[]
+    dashboardWidgets     DashboardWidget[]
+    perusahaanPakets     PerusahaanPaket[]
+    dokumenTransaksi     DokumenTransaksi[]
 
     @@index([kode])
     @@index([npwp])
@@ -241,6 +243,7 @@ model Pengguna {
 
     // Multi-Tenant Access
     aksesPerusahaan AksesPengguna[]
+    invitationsSent UndanganPengguna[] @relation("UserInvitations")
 
     // Security Hardening Relations
     refreshTokens     RefreshToken[]
@@ -252,6 +255,65 @@ model Pengguna {
     @@index([email])
 }
 
+model Role {
+    id          String  @id @default(cuid())
+    name        String // ADMIN, MANAGER, ACCOUNTANT, etc
+    displayName String // "Administrator", "Manajer", etc
+    description String?
+
+    // Permissions for this role
+    permissions Permission[]
+
+    // Role hierarchy
+    level Int @default(0) // 0=highest (superadmin), 5=lowest (staff)
+
+    // Can this role assign other roles?
+    canAssignRoles  Boolean  @default(false)
+    assignableRoles String[] // Array of role IDs or names they can assign
+
+    // System vs Custom
+    isSystemRole Boolean     @default(true) // Cannot delete system roles
+    companyId    String?
+    company      Perusahaan? @relation(fields: [companyId], references: [id])
+
+    aksesPengguna AksesPengguna[]
+    invitations   UndanganPengguna[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([companyId, name])
+    @@index([companyId])
+}
+
+model UndanganPengguna {
+    id String @id @default(cuid())
+
+    perusahaanId String
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id], onDelete: Cascade)
+
+    email  String
+    roleId String
+    role   Role   @relation(fields: [roleId], references: [id])
+
+    invitedBy String
+    inviter   Pengguna @relation("UserInvitations", fields: [invitedBy], references: [id])
+
+    token     String   @unique
+    expiresAt DateTime
+
+    acceptedAt DateTime?
+    acceptedBy String?
+
+    message String? // Optional invitation message
+
+    createdAt DateTime @default(now())
+
+    @@index([perusahaanId])
+    @@index([email])
+    @@index([token])
+}
+
 model AksesPengguna {
     id           String     @id @default(cuid())
     pengguna     Pengguna   @relation(fields: [penggunaId], references: [id], onDelete: Cascade)
@@ -261,11 +323,16 @@ model AksesPengguna {
     cabang       Cabang?    @relation(fields: [cabangId], references: [id])
     cabangId     String?
 
-    role      Role    @default(STAFF)
+    // Deprecated: use roleId instead. Kept for migration safety.
+    roleEnum UserRole @default(STAFF) @map("role")
+
+    roleId  String?
+    roleRef Role?   @relation(fields: [roleId], references: [id])
+
     isAktif   Boolean @default(true)
     isDefault Boolean @default(false)
 
-    // Per-company permissions/access
+    // Per-company permissions/access (Overrides Role permissions if needed - Advanced)
     aksesModul  Json?
     permissions Json?
 
@@ -276,4 +343,5 @@ model AksesPengguna {
     @@index([penggunaId])
     @@index([perusahaanId])
     @@index([cabangId])
+    @@index([roleId])
 }

@@ -13,9 +13,8 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 export default function SettingsPage() {
     const { user } = useRequireAuth();
     const companyId = user?.perusahaan?.id;
-    const { useCompanyDetails, updateCompany } = useCompany();
-    const { data: company, isLoading } = useCompanyDetails(companyId || '');
-    const updateMutation = updateCompany;
+    const { currentCompany: company, loading: isLoading, updateCompany: updateCompanyFn } = useCompany();
+    const [isSaving, setIsSaving] = useState(false);
 
     const [form, setForm] = useState({
         nama: '',
@@ -43,9 +42,14 @@ export default function SettingsPage() {
         setForm({ ...form, [e.target.id]: e.target.value });
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!companyId) return;
-        updateMutation.mutate({ id: companyId, data: form });
+        try {
+            setIsSaving(true);
+            await updateCompanyFn(companyId, form);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (isLoading) {
@@ -112,9 +116,9 @@ export default function SettingsPage() {
                                 <Button
                                     className="bg-primary hover:bg-primary/90"
                                     onClick={handleSave}
-                                    disabled={updateMutation.isPending}
+                                    disabled={isSaving}
                                 >
-                                    {updateMutation.isPending ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}
+                                    {isSaving ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}
                                     Simpan Perubahan
                                 </Button>
                             </div>

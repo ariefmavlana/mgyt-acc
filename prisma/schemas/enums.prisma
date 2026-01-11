@@ -3,7 +3,7 @@
 // All enums with @map for database/TypeScript separation
 // ============================================================================
 
-enum Role {
+enum UserRole {
     SUPERADMIN
     ADMIN
     MANAGER
@@ -19,6 +19,81 @@ enum Role {
     WAREHOUSE_MANAGER
     PURCHASING
     SALES
+}
+
+enum Permission {
+    // Company Management
+    COMPANY_VIEW
+    COMPANY_EDIT
+    COMPANY_DELETE
+    COMPANY_SETTINGS
+
+    // User Management
+    USER_VIEW
+    USER_CREATE
+    USER_EDIT
+    USER_DELETE
+    USER_ASSIGN_ROLE
+
+    // Transactions
+    TRANSACTION_VIEW_ALL
+    TRANSACTION_VIEW_OWN
+    TRANSACTION_CREATE
+    TRANSACTION_EDIT
+    TRANSACTION_DELETE
+    TRANSACTION_APPROVE
+
+    // Invoices & Bills
+    INVOICE_VIEW
+    INVOICE_CREATE
+    INVOICE_EDIT
+    INVOICE_DELETE
+    INVOICE_SEND
+
+    BILL_VIEW
+    BILL_CREATE
+    BILL_EDIT
+    BILL_DELETE
+
+    // Payments
+    PAYMENT_VIEW
+    PAYMENT_CREATE
+    PAYMENT_EDIT
+    PAYMENT_DELETE
+
+    // Inventory
+    PRODUCT_VIEW
+    PRODUCT_CREATE
+    PRODUCT_EDIT
+    PRODUCT_DELETE
+
+    STOCK_VIEW
+    STOCK_ADJUST
+
+    // Reports
+    REPORT_VIEW_FINANCIAL
+    REPORT_VIEW_OPERATIONAL
+    REPORT_VIEW_AUDIT
+    REPORT_EXPORT
+
+    // Accounting
+    COA_VIEW
+    COA_EDIT
+    RECONCILIATION_VIEW
+    RECONCILIATION_PERFORM
+    PERIOD_CLOSE
+
+    // Approvals
+    APPROVE_LEVEL_1
+    APPROVE_LEVEL_2
+    APPROVE_LEVEL_3
+
+    // System
+    AUDIT_VIEW
+    SETTINGS_VIEW
+    SETTINGS_EDIT
+    BACKUP_CREATE
+    BACKUP_RESTORE
 }
 
 enum TipeAkun {

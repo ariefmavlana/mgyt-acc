@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 export const registerSchema = z.object({
     namaLengkap: z.string().min(3, 'Nama harus minimal 3 karakter'),
@@ -12,7 +12,7 @@ export const registerSchema = z.object({
         .regex(/[0-9]/, 'Password harus mengandung setidaknya satu angka')
         .regex(/[^A-Za-z0-0]/, 'Password harus mengandung setidaknya satu karakter khusus'),
     confirmPassword: z.string(),
-    role: z.nativeEnum(Role).optional().default(Role.STAFF),
+    role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
     namaPerusahaan: z.string().min(2, 'Nama perusahaan harus minimal 2 karakter').optional(),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Konfirmasi password tidak cocok",

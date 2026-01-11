@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { Button } from '@/components/ui/button';
-import { LogOut, LayoutDashboard, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
+import { LogOut, TrendingUp, TrendingDown, DollarSign, Wallet, Users, Activity } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -39,58 +39,58 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {/* Total Assets */}
-                <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
+                {/* Revenue */}
+                <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-blue-700">Total Aset</CardTitle>
-                        <Wallet className="h-4 w-4 text-blue-600" />
+                        <CardTitle className="text-sm font-medium text-indigo-700">Total Pendapatan</CardTitle>
+                        <DollarSign className="h-4 w-4 text-indigo-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-900">{formatCurrency(stats?.assets || 0)}</div>
-                        <p className="text-xs text-blue-600/80 mt-1">
-                            Posisi keuangan saat ini
+                        <div className="text-2xl font-bold text-indigo-900">{formatCurrency(stats?.revenue || 0)}</div>
+                        <p className="text-xs text-indigo-600/80 mt-1">
+                            Akumulasi pendapatan terposting
                         </p>
                     </CardContent>
                 </Card>
 
-                {/* Net Income */}
-                <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-emerald-700">Laba Bersih (Bulan Ini)</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-emerald-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-emerald-900">{formatCurrency(stats?.netIncome || 0)}</div>
-                        <p className="text-xs text-emerald-600/80 mt-1">
-                            Pendapatan dikurangi beban
-                        </p>
-                    </CardContent>
-                </Card>
-
-                {/* Receivables */}
-                <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-100">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-amber-700">Total Piutang</CardTitle>
-                        <DollarSign className="h-4 w-4 text-amber-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-amber-900">{formatCurrency(stats?.receivables || 0)}</div>
-                        <p className="text-xs text-amber-600/80 mt-1">
-                            Uang yang akan diterima
-                        </p>
-                    </CardContent>
-                </Card>
-
-                {/* Payables */}
+                {/* Expenses */}
                 <Card className="bg-gradient-to-br from-rose-50 to-white border-rose-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-rose-700">Total Hutang</CardTitle>
+                        <CardTitle className="text-sm font-medium text-rose-700">Total Beban</CardTitle>
                         <TrendingDown className="h-4 w-4 text-rose-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-rose-900">{formatCurrency(stats?.payables || 0)}</div>
+                        <div className="text-2xl font-bold text-rose-900">{formatCurrency(stats?.expense || 0)}</div>
                         <p className="text-xs text-rose-600/80 mt-1">
-                            Kewajiban yang harus dibayar
+                            Akumulasi beban operasional
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* Net Profit */}
+                <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-emerald-700">Laba Bersih</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-emerald-900">{formatCurrency(stats?.netProfit || 0)}</div>
+                        <p className="text-xs text-emerald-600/80 mt-1">
+                            Pendapatan - Beban
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* Active Users/Pending Approvals Mix */}
+                <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-100">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-amber-700">Pending Approval</CardTitle>
+                        <Activity className="h-4 w-4 text-amber-600" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-amber-900">{stats?.pendingApprovals || 0}</div>
+                        <p className="text-xs text-amber-600/80 mt-1">
+                            Menunggu persetujuan
                         </p>
                     </CardContent>
                 </Card>
@@ -108,12 +108,12 @@ export default function DashboardPage() {
                                 <span className="font-semibold text-slate-900">{user?.perusahaan?.nama}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                                <span className="text-sm font-medium text-slate-600">Peran Pengguna</span>
-                                <span className="font-semibold text-slate-900">{user?.role}</span>
+                                <span className="text-sm font-medium text-slate-600">Pengguna Aktif</span>
+                                <span className="font-semibold text-slate-900">{stats?.activeUsers || 0} User</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                                <span className="text-sm font-medium text-slate-600">Tier Paket</span>
-                                <span className="font-semibold text-slate-900">{user?.perusahaan?.tier || 'FREE'}</span>
+                                <span className="text-sm font-medium text-slate-600">Saldo Kas</span>
+                                <span className="font-semibold text-slate-900">{formatCurrency(stats?.cashBalance || 0)}</span>
                             </div>
                         </div>
                     </CardContent>
@@ -127,11 +127,11 @@ export default function DashboardPage() {
                         <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/transactions/new'}>
                             + Transaksi Baru
                         </Button>
-                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/invoices/new'}>
-                            + Invoice Baru
+                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/inventory/transfer'}>
+                            + Transfer Stok
                         </Button>
-                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/bills'}>
-                            + Tagihan (Bill)
+                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/inventory/opname'}>
+                            + Stock Opname
                         </Button>
                         <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/employees'}>
                             + Karyawan

@@ -6,6 +6,8 @@ import {
     getCashFlow,
     getARAging,
     getAPAging,
+    getTrialBalance,
+    getGeneralLedger,
     triggerReminders,
     exportReport
 } from '../controllers/reporting.controller';
@@ -19,6 +21,8 @@ router.get('/income-statement', getIncomeStatement);
 router.get('/cash-flow', getCashFlow);
 router.get('/ar-aging', getARAging);
 router.get('/ap-aging', getAPAging);
+router.get('/trial-balance', getTrialBalance);
+router.get('/general-ledger', getGeneralLedger);
 router.post('/trigger-reminders', triggerReminders);
 router.post('/export', exportReport);
 

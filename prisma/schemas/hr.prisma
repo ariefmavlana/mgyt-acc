@@ -26,6 +26,7 @@ model Karyawan {
     npwp                String?
     bpjsKesehatan       String?
     bpjsKetenagakerjaan String?
+    statusPernikahan    String  @default("TK/0") // TK/0, K/1, etc. for PTKP
 
     tanggalMasuk  DateTime
     tanggalKeluar DateTime?

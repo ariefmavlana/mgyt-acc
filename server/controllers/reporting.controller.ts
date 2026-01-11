@@ -248,37 +248,266 @@ export const getIncomeStatement = async (req: Request, res: Response) => {
 };
 
 export const getCashFlow = async (req: Request, res: Response) => {
-    // Simplified Indirect Method
-    // Operating: Net Income + Non-Cash Exp (Depreciation) + Changes in Working Capital (AR, AP, Inventory)
-    // Investing: Changes in Fixed Assets
-    // Financing: Changes in Equity/Loans
     try {
         const authReq = req as AuthRequest;
-        res.status(501).json({ message: 'Laporan Arus Kas belum tersedia dalam versi ini.' });
-        // Placeholder as full indirect method requires complex logic mapping
-        // Will implement if time permits or strictly requested with logic detail
+        const { startDate, endDate } = req.query;
+        const perusahaanId = authReq.currentCompanyId!;
+
+        const start = startDate ? new Date(String(startDate)) : startOfYear(new Date());
+        const end = endDate ? endOfDay(new Date(String(endDate))) : endOfDay(new Date());
+
+        // Direct Method Approximation:
+        // 1. Operating: Receipts from customers (Revenue), Payments to suppliers (Expenses) - mapped via Cash/Bank mutations
+        // 2. Investing: Purchase/Sale of Assets
+        // 3. Financing: Equity/Loans
+
+        // For this version, we will categorize based on the 'lawan transaksi' account type in the Journal
+        // This is a simplified "Net Cash Movement" approach.
+
+        const cashAccounts = await prisma.chartOfAccounts.findMany({
+            where: {
+                perusahaanId,
+                kategoriAset: 'KAS_DAN_SETARA_KAS'
+            },
+            select: { id: true }
+        });
+
+        const cashAccountIds = cashAccounts.map(c => c.id);
+
+        // Find all journal details involving cash accounts
+        const cashMovements = await prisma.jurnalDetail.findMany({
+            where: {
+                akunId: { in: cashAccountIds },
+                jurnal: {
+                    perusahaanId,
+                    tanggal: { gte: start, lte: end }
+                }
+            },
+            include: {
+                jurnal: {
+                    include: {
+                        detail: {
+                            include: { akun: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        let operatingCashFlow = 0;
+        let investingCashFlow = 0;
+        let financingCashFlow = 0;
+
+        // Naive categorization logic roughly:
+        // If Cash Debit -> Inflow. Check other side of journal.
+        // If Cash Credit -> Outflow. Check other side.
+
+        // This loop is computationally heavy for large datasets but acceptable for MVP/SME scale.
+        for (const move of cashMovements) {
+            const isDebit = Number(move.debit) > 0;
+            const amount = isDebit ? Number(move.debit) : -Number(move.kredit);
+
+            // Find the "contra" account (simplistic assumption: usually 2 lines in journal)
+            // If complex journal, we take the dominant other entry or just dump into Operating for now.
+            // move.jurnal has 'detail' property now due to include change
+            const contraEntry = move.jurnal.detail.find((d: any) => !cashAccountIds.includes(d.akunId));
+
+            if (contraEntry) {
+                const type = contraEntry.akun.tipe;
+                if (['ASET_TETAP', 'INVESTASI_JANGKA_PANJANG', 'PROPERTI_INVESTASI'].includes(type)) {
+                    investingCashFlow += amount;
+                } else if (['LIABILITAS_JANGKA_PANJANG', 'EKUITAS'].includes(type)) {
+                    financingCashFlow += amount;
+                } else {
+                    // Current Assets (AR), Current Liabilities (AP), Revenue, Expenses -> Operating
+                    operatingCashFlow += amount;
+                }
+            } else {
+                // Transfer between cash accounts? Ignore net effect zero, or internal movement.
+                // Or unmatched. Default to operating.
+                operatingCashFlow += amount;
+            }
+        }
+
+        const result = {
+            operating: operatingCashFlow,
+            investing: investingCashFlow,
+            financing: financingCashFlow,
+            netChange: operatingCashFlow + investingCashFlow + financingCashFlow,
+            period: { start, end }
+        };
+
+        res.json(result);
+
     } catch (error) {
-        res.status(500).json({ message: 'Error generating Cash Flow' });
+        console.error('Cash Flow Error:', error);
+        res.status(500).json({ message: 'Gagal menghasilkan Laporan Arus Kas' });
     }
 };
 
+export const getTrialBalance = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const { date } = req.query;
+        const perusahaanId = authReq.currentCompanyId!;
+        const asOfDate = date ? endOfDay(new Date(String(date))) : endOfDay(new Date());
 
-// --- EXPORT HANDLERS ---
+        const accounts = await prisma.chartOfAccounts.findMany({
+            where: { perusahaanId },
+            include: {
+                jurnalDetail: {
+                    where: {
+                        jurnal: { tanggal: { lte: asOfDate } }
+                    },
+                    select: { debit: true, kredit: true }
+                }
+            },
+            orderBy: { kodeAkun: 'asc' }
+        });
+
+        const report = accounts.map(acc => {
+            const totalDebit = acc.jurnalDetail.reduce((sum, jd) => sum + Number(jd.debit), 0);
+            const totalCredit = acc.jurnalDetail.reduce((sum, jd) => sum + Number(jd.kredit), 0);
+
+            // Trial balance shows net debit or credit per account usually, 
+            // OR strictly total Debit and Total Credit side by side.
+            // Let's show Debit vs Credit totals for the trial balance columns.
+
+            let finalDebit = 0;
+            let finalCredit = 0;
+
+            if (totalDebit >= totalCredit) {
+                finalDebit = totalDebit - totalCredit;
+            } else {
+                finalCredit = totalCredit - totalDebit;
+            }
+
+            return {
+                id: acc.id,
+                kode: acc.kodeAkun,
+                nama: acc.namaAkun,
+                debit: finalDebit,
+                kredit: finalCredit
+            };
+        }).filter(item => item.debit > 0 || item.kredit > 0);
+
+        const totalDebit = report.reduce((sum, r) => sum + r.debit, 0);
+        const totalCredit = report.reduce((sum, r) => sum + r.kredit, 0);
+
+        res.json({
+            data: report,
+            summary: {
+                totalDebit,
+                totalCredit,
+                isBalanced: Math.abs(totalDebit - totalCredit) < 1 // Floating point tolerance
+            }
+        });
+
+    } catch (error) {
+        console.error('Trial Balance Error:', error);
+        res.status(500).json({ message: 'Gagal menghasilkan Neraca Saldo' });
+    }
+};
+
+export const getGeneralLedger = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const { accountId, startDate, endDate } = req.query;
+        const perusahaanId = authReq.currentCompanyId!;
+
+        if (!accountId) {
+            return res.status(400).json({ message: 'Account ID is required' });
+        }
+
+        const start = startDate ? new Date(String(startDate)) : startOfYear(new Date());
+        const end = endDate ? endOfDay(new Date(String(endDate))) : endOfDay(new Date());
+
+        // 1. Get Opening Balance (Before Start Date)
+        const openingAgg = await prisma.jurnalDetail.aggregate({
+            where: {
+                akunId: String(accountId),
+                jurnal: {
+                    perusahaanId,
+                    tanggal: { lt: start }
+                }
+            },
+            _sum: { debit: true, kredit: true }
+        });
+
+        const account = await prisma.chartOfAccounts.findUnique({ where: { id: String(accountId) } });
+        if (!account) return res.status(404).json({ message: 'Account not found' });
+
+        const openDebit = Number(openingAgg._sum.debit || 0);
+        const openCredit = Number(openingAgg._sum.kredit || 0);
+        let openingBalance = 0;
+
+        // Normal Balance Logic for Running Balance
+        const isDebitNormal = ['ASET', 'BEBAN'].includes(account.tipe);
+
+        if (isDebitNormal) {
+            openingBalance = openDebit - openCredit;
+        } else {
+            openingBalance = openCredit - openDebit;
+        }
+
+        // 2. Get Transactions (In Range)
+        const transactions = await prisma.jurnalDetail.findMany({
+            where: {
+                akunId: String(accountId),
+                jurnal: {
+                    perusahaanId,
+                    tanggal: { gte: start, lte: end }
+                }
+            },
+            include: {
+                jurnal: true
+            },
+            orderBy: { jurnal: { tanggal: 'asc' } }
+        });
+
+        // 3. Calculate Running Balance
+        let currentBalance = openingBalance;
+        const lines = transactions.map(tx => {
+            const deb = Number(tx.debit);
+            const cred = Number(tx.kredit);
+
+            if (isDebitNormal) {
+                currentBalance += (deb - cred);
+            } else {
+                currentBalance += (cred - deb);
+            }
+
+            return {
+                date: tx.jurnal.tanggal,
+                ref: tx.jurnal.noJurnal,
+                description: tx.jurnal.keterangan || tx.jurnal.noJurnal,
+                debit: deb,
+                credit: cred,
+                balance: currentBalance
+            };
+        });
+
+        res.json({
+            account: {
+                name: account.namaAkun,
+                code: account.kodeAkun,
+                type: account.tipe
+            },
+            period: { start, end },
+            openingBalance,
+            transactions: lines,
+            closingBalance: currentBalance
+        });
+
+    } catch (error) {
+        console.error('General Ledger Error:', error);
+        res.status(500).json({ message: 'Gagal menghasilkan Buku Besar' });
+    }
+};
 
 export const exportReport = async (req: Request, res: Response) => {
     try {
-        const { type, format: fileFormat, data } = req.body;
-        // In a strict environment, we should recalculate here. For simplicity/speed, we trust the payload or fetch again.
-        // Let's assume we re-fetch to ensure security/data integrity, but that requires mapping all params again.
-        // For this prototype, let's generate based on 'type' and query params forwarded.
-
-        // Actually, best pattern: Client requests Export, Server fetches data + Generates File.
-        // We will reuse the logic above.
-
-        // ... Implementation of PDF/Excel Generation ...
-        // Since this can be large, I will implement a basic stub that performs the action for the User
-        // or just return a 501 if we want to focus on onscreen first. 
-        // User requested "Complete implementation", so I should add basic PDF generation.
+        const { type, format: fileFormat } = req.body;
 
         if (fileFormat === 'pdf') {
             const doc = new PDFDocument();
@@ -313,6 +542,7 @@ export const exportReport = async (req: Request, res: Response) => {
         }
 
         res.status(400).json({ message: 'Invalid format' });
+
     } catch (error) {
         res.status(500).json({ message: 'Export failed' });
     }

@@ -11,6 +11,10 @@ interface Company {
     nama: string;
     email: string | null;
     telepon: string | null;
+    alamat: string | null;
+    website: string | null;
+    npwp: string | null;
+    logoUrl: string | null;
     tier: string;
     mataUangUtama: string;
 }
@@ -22,6 +26,8 @@ interface CompanyContextType {
     fetchCompanies: () => Promise<void>;
     switchCompany: (id: string) => Promise<void>;
     createCompany: (data: Record<string, unknown>) => Promise<unknown>;
+    updateCompany: (id: string, data: Partial<Company>) => Promise<unknown>;
+    updateSettings: (id: string, data: any) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -85,6 +91,35 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     };
 
+    const updateCompany = async (id: string, data: Partial<Company>) => {
+        try {
+            const res = await api.put(`/companies/${id}`, data);
+            toast.success('Profil perusahaan berhasil diperbarui');
+            await fetchCompanies();
+            // If updating current company, update state
+            if (currentCompany?.id === id) {
+                setCurrentCompany({ ...currentCompany, ...res.data });
+            }
+            return res.data;
+        } catch (err: unknown) {
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            toast.error(axiosError.response?.data?.message || 'Gagal memperbarui profil perusahaan');
+            throw err;
+        }
+    };
+
+    const updateSettings = async (id: string, data: any) => {
+        try {
+            await api.put(`/companies/${id}/settings`, data);
+            toast.success('Pengaturan berhasil disimpan');
+            await fetchCompanies();
+        } catch (err: unknown) {
+            const axiosError = err as { response?: { data?: { message?: string } } };
+            toast.error(axiosError.response?.data?.message || 'Gagal menyimpan pengaturan');
+            throw err;
+        }
+    };
+
     return (
         <CompanyContext.Provider value={{
             companies,
@@ -92,7 +127,9 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             loading,
             fetchCompanies,
             switchCompany,
-            createCompany: createNewCompany
+            createCompany: createNewCompany,
+            updateCompany,
+            updateSettings
         }}>
             {children}
         </CompanyContext.Provider>

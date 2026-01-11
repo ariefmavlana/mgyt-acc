@@ -1,3 +1,4 @@
+
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
@@ -25,7 +26,14 @@ export const getStock = async (req: Request, res: Response) => {
         const stocks = await prisma.stokPersediaan.findMany({
             where,
             include: {
-                persediaan: { select: { namaPersediaan: true, kodePersediaan: true, satuan: true } },
+                persediaan: {
+                    select: {
+                        namaPersediaan: true,
+                        kodePersediaan: true,
+                        satuan: true,
+                        produk: { select: { id: true } } // Get Product ID
+                    }
+                },
                 gudang: { select: { nama: true, kode: true } }
             }
         });
@@ -57,107 +65,183 @@ export const recordMovement = async (req: Request, res: Response) => {
                 }
 
                 const persediaanId = product.persediaanId;
-                const costPrice = product.persediaan ? Number(product.persediaan.hargaBeli) : 0; // Use Moving Average later
+                const costPrice = product.persediaan ? Number(product.persediaan.hargaBeli) : 0;
 
-                // 2. Handle Source Warehouse (OUT or TRANSFER)
-                if (['KELUAR', 'TRANSFER'].includes(validatedData.tipe)) {
+                // LOGIC HANDLE NEGATIVE ADJUSTMENT
+                // If Adjustment and Qty < 0 -> Treat as OUT
+                // If Adjustment and Qty > 0 -> Treat as IN
+
+                const absQty = Math.abs(item.kuantitas);
+
+                if (validatedData.tipe === 'TRANSFER') {
+                    // === TRANSFER LOGIC (ATOMIC OUT + IN) ===
+                    const targetGudangId = validatedData.gudangTujuanId!;
+
+                    // 1. CHECK SOURCE STOCK
                     const currentStock = await tx.stokPersediaan.findUnique({
                         where: {
-                            persediaanId_gudangId: {
-                                persediaanId,
-                                gudangId: validatedData.gudangId
-                            }
+                            persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId }
                         }
                     });
-
                     const currentQty = currentStock ? Number(currentStock.kuantitas) : 0;
-                    if (currentQty < item.kuantitas) {
-                        throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk} di gudang asal`);
+                    if (currentQty < absQty) {
+                        throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk} di gudang asal. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
                     }
 
-                    // Decrement Source
+                    // 2. DECREMENT SOURCE
                     await tx.stokPersediaan.upsert({
-                        where: {
-                            persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId }
-                        },
+                        where: { persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId } },
                         create: {
-                            persediaanId,
-                            gudangId: validatedData.gudangId,
-                            kuantitas: -item.kuantitas,
-                            nilaiStok: -item.kuantitas * costPrice, // Simplified
+                            persediaanId, gudangId: validatedData.gudangId,
+                            kuantitas: -absQty, nilaiStok: -absQty * costPrice,
                         },
-                        update: {
-                            kuantitas: { decrement: item.kuantitas }
-                        }
+                        update: { kuantitas: { decrement: absQty } }
                     });
 
-                    // Log Mutation OUT
                     await tx.mutasiPersediaan.create({
                         data: {
-                            persediaanId,
-                            gudangId: validatedData.gudangId,
-                            nomorMutasi: `MUT-${Date.now()}`,
+                            persediaanId, gudangId: validatedData.gudangId,
+                            nomorMutasi: `MUT-${Date.now()}-OUT`,
                             tanggal: new Date(validatedData.tanggal),
-                            tipe: validatedData.tipe === 'TRANSFER' ? 'TRANSFER_OUT' : 'KELUAR',
-                            kuantitas: item.kuantitas,
-                            harga: costPrice,
-                            nilai: item.kuantitas * costPrice,
-                            saldoSebelum: currentQty,
-                            saldoSesudah: currentQty - item.kuantitas,
+                            tipe: 'TRANSFER_OUT',
+                            kuantitas: absQty, harga: costPrice, nilai: absQty * costPrice,
+                            saldoSebelum: currentQty, saldoSesudah: currentQty - absQty,
                             referensi: validatedData.referensi,
-                            keterangan: validatedData.keterangan || (validatedData.tipe === 'TRANSFER' ? `Transfer ke ${validatedData.gudangTujuanId}` : 'Pengeluaran Manual')
+                            keterangan: validatedData.keterangan || `Transfer ke Gudang ID: ${targetGudangId}` // TODO: Fetch name if possible, or just ID
                         }
                     });
-                }
 
-                // 3. Handle Destination / Incoming (MASUK, ADJUSTMENT, TRANSFER)
-                if (['MASUK', 'ADJUSTMENT', 'TRANSFER'].includes(validatedData.tipe)) {
-                    // Start logic for destination
-                    // If TRANSFER, destination is gudangTujuanId. If MASUK/ADJUST, it's gudangId.
-                    const targetGudangId = validatedData.tipe === 'TRANSFER' ? validatedData.gudangTujuanId : validatedData.gudangId;
-
-                    if (!targetGudangId) throw new Error('Gudang tujuan harus dipilih untuk Transfer');
-
+                    // 3. INCREMENT TARGET
                     const currentStockDest = await tx.stokPersediaan.findUnique({
-                        where: {
-                            persediaanId_gudangId: { persediaanId, gudangId: targetGudangId }
-                        }
+                        where: { persediaanId_gudangId: { persediaanId, gudangId: targetGudangId } }
                     });
-                    const beforeQty = currentStockDest ? Number(currentStockDest.kuantitas) : 0;
+                    const beforeQtyDest = currentStockDest ? Number(currentStockDest.kuantitas) : 0;
 
-                    // Increment Destination
                     await tx.stokPersediaan.upsert({
-                        where: {
-                            persediaanId_gudangId: { persediaanId, gudangId: targetGudangId }
-                        },
+                        where: { persediaanId_gudangId: { persediaanId, gudangId: targetGudangId } },
                         create: {
-                            persediaanId,
-                            gudangId: targetGudangId,
-                            kuantitas: item.kuantitas,
-                            nilaiStok: item.kuantitas * costPrice
+                            persediaanId, gudangId: targetGudangId,
+                            kuantitas: absQty, nilaiStok: absQty * costPrice
                         },
-                        update: {
-                            kuantitas: { increment: item.kuantitas }
-                        }
+                        update: { kuantitas: { increment: absQty } }
                     });
 
-                    // Log Mutation IN
                     await tx.mutasiPersediaan.create({
                         data: {
-                            persediaanId,
-                            gudangId: targetGudangId,
+                            persediaanId, gudangId: targetGudangId,
                             nomorMutasi: `MUT-${Date.now()}-IN`,
                             tanggal: new Date(validatedData.tanggal),
-                            tipe: validatedData.tipe === 'TRANSFER' ? 'TRANSFER_IN' : validatedData.tipe,
-                            kuantitas: item.kuantitas,
-                            harga: costPrice,
-                            nilai: item.kuantitas * costPrice,
-                            saldoSebelum: beforeQty,
-                            saldoSesudah: beforeQty + item.kuantitas,
+                            tipe: 'TRANSFER_IN',
+                            kuantitas: absQty, harga: costPrice, nilai: absQty * costPrice,
+                            saldoSebelum: beforeQtyDest, saldoSesudah: beforeQtyDest + absQty,
                             referensi: validatedData.referensi,
-                            keterangan: validatedData.keterangan || (validatedData.tipe === 'TRANSFER' ? `Transfer dari ${validatedData.gudangId}` : 'Penerimaan Manual')
+                            keterangan: validatedData.keterangan || `Transfer dari Gudang ID: ${validatedData.gudangId}`
                         }
                     });
+
+                } else {
+                    // === NORMAL IN/OUT/ADJUSTMENT LOGIC ===
+                    let isDecrement = false;
+                    if (validatedData.tipe === 'ADJUSTMENT' && item.kuantitas < 0) {
+                        isDecrement = true;
+                    } else if (validatedData.tipe === 'KELUAR') {
+                        isDecrement = true;
+                    }
+
+                    if (isDecrement) {
+                        // CHECK STOCK
+                        const currentStock = await tx.stokPersediaan.findUnique({
+                            where: {
+                                persediaanId_gudangId: {
+                                    persediaanId,
+                                    gudangId: validatedData.gudangId
+                                }
+                            }
+                        });
+                        const currentQty = currentStock ? Number(currentStock.kuantitas) : 0;
+                        if (currentQty < absQty) {
+                            throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk}. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
+                        }
+
+                        // DECREMENT
+                        await tx.stokPersediaan.upsert({
+                            where: {
+                                persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId }
+                            },
+                            create: {
+                                persediaanId,
+                                gudangId: validatedData.gudangId,
+                                kuantitas: -absQty,
+                                nilaiStok: -absQty * costPrice,
+                            },
+                            update: {
+                                kuantitas: { decrement: absQty }
+                            }
+                        });
+
+                        // LOG
+                        await tx.mutasiPersediaan.create({
+                            data: {
+                                persediaanId,
+                                gudangId: validatedData.gudangId,
+                                nomorMutasi: `MUT-${Date.now()}`,
+                                tanggal: new Date(validatedData.tanggal),
+                                tipe: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT_OUT' : 'KELUAR',
+                                kuantitas: absQty,
+                                harga: costPrice,
+                                nilai: absQty * costPrice,
+                                saldoSebelum: currentQty,
+                                saldoSesudah: currentQty - absQty,
+                                referensi: validatedData.referensi,
+                                keterangan: validatedData.keterangan || 'Pengurangan Stok'
+                            }
+                        });
+
+                    } else {
+                        // INCREMENT (MASUK, ADJUSTMENT POSITIVE)
+                        const targetGudangId = validatedData.gudangId;
+
+                        const currentStockDest = await tx.stokPersediaan.findUnique({
+                            where: {
+                                persediaanId_gudangId: { persediaanId, gudangId: targetGudangId }
+                            }
+                        });
+                        const beforeQty = currentStockDest ? Number(currentStockDest.kuantitas) : 0;
+
+                        // Increment
+                        await tx.stokPersediaan.upsert({
+                            where: {
+                                persediaanId_gudangId: { persediaanId, gudangId: targetGudangId }
+                            },
+                            create: {
+                                persediaanId,
+                                gudangId: targetGudangId,
+                                kuantitas: absQty,
+                                nilaiStok: absQty * costPrice
+                            },
+                            update: {
+                                kuantitas: { increment: absQty }
+                            }
+                        });
+
+                        // Log
+                        await tx.mutasiPersediaan.create({
+                            data: {
+                                persediaanId,
+                                gudangId: targetGudangId,
+                                nomorMutasi: `MUT-${Date.now()}-IN`,
+                                tanggal: new Date(validatedData.tanggal),
+                                tipe: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT_IN' : 'MASUK',
+                                kuantitas: absQty,
+                                harga: costPrice,
+                                nilai: absQty * costPrice,
+                                saldoSebelum: beforeQty,
+                                saldoSesudah: beforeQty + absQty,
+                                referensi: validatedData.referensi,
+                                keterangan: validatedData.keterangan || 'Penambahan Stok'
+                            }
+                        });
+                    }
                 }
 
                 results.push({ produk: product.namaProduk, status: 'OK' });
