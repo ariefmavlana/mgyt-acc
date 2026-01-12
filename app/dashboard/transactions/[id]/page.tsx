@@ -103,12 +103,34 @@ export default function TransactionDetailPage() {
                         </p>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={() => window.print()}>
                             <Printer className="mr-2 h-4 w-4" /> Cetak Voucher
                         </Button>
-                        <Button variant="outline" className="text-red-600 hover:bg-red-50">
-                            <Trash2 className="mr-2 h-4 w-4" /> Batalkan
-                        </Button>
+                        {!transaction.isVoid && (
+                            <Button
+                                variant="outline"
+                                className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                                onClick={async () => {
+                                    if (!confirm('Apakah Anda yakin ingin membatalkan transaksi ini? Tindakan ini tidak dapat dibatalkan.')) return;
+
+                                    try {
+                                        setLoading(true);
+                                        await api.delete(`/transactions/${id}/void`);
+                                        toast.success('Transaksi berhasil dibatalkan');
+                                        fetchTransaction();
+                                    } catch (error: any) {
+                                        toast.error(error.response?.data?.message || 'Gagal membatalkan transaksi');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" /> Batalkan
+                            </Button>
+                        )}
+                        {transaction.isVoid && (
+                            <Badge variant="destructive">VOIDED</Badge>
+                        )}
                     </div>
                 </div>
             </div>

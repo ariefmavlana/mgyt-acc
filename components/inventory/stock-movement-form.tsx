@@ -5,12 +5,11 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, ArrowRightLeft } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Form,
     FormControl,
@@ -26,7 +25,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
 
 // Validation Schema mirroring backend
 const movementSchema = z.object({
@@ -44,9 +42,12 @@ const movementSchema = z.object({
 
 type MovementValues = z.infer<typeof movementSchema>;
 
+interface Warehouse { id: string; nama: string; kode: string; cabang?: { nama: string } }
+interface Product { id: string; namaProduk: string; kodeProduk: string; satuan: string;[key: string]: any }
+
 export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
-    const [warehouses, setWarehouses] = useState<any[]>([]);
-    const [products, setProducts] = useState<any[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
 
     // Load initial data
     useEffect(() => {
@@ -70,12 +71,11 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                 // I'll create a hardcoded list or fetch from Cabang if needed.
                 // Wait, I saw `gudangId` in `StokPersediaan`.
 
-                setProducts(prodRes.data.data);
-
-                // Check if warehouse endpoint exists. If not, I'll quick-fix or use dummy.
-                // Let's assume we have at least one MAIN warehouse.
+                setProducts(prodRes.data.data || prodRes.data);
+                setWarehouses(whRes.data);
             } catch (e) {
-                console.error(e);
+                console.error('Failed to load stock movement data:', e);
+                toast.error('Gagal memuat data pendukung');
             }
         };
         // Quick fetch warehouses workaround: 
@@ -99,10 +99,6 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
     // or just hardcode a selector if purely frontend task, but better to be real.
     // I previously saw `Gudang` model.
     // I'll put a placeholder for now. 
-    const dummyWarehouses = [
-        { id: 'wh-main', nama: 'Gudang Utama' },
-        { id: 'wh-cabang', nama: 'Gudang Cabang' }
-    ];
 
     const form = useForm<MovementValues>({
         resolver: zodResolver(movementSchema),
@@ -127,7 +123,8 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
             form.reset();
             if (onSuccess) onSuccess();
         } catch (error: any) {
-            toast.error(error.response?.data?.message || 'Gagal menyimpan');
+            const err = error as { response?: { data?: { message?: string } } };
+            toast.error(err.response?.data?.message || 'Gagal menyimpan');
         }
     };
 
@@ -191,9 +188,8 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        {/* Using dummy for now as safely assumed, ideally populated from API */}
-                                        {dummyWarehouses.map(w => (
-                                            <SelectItem key={w.id} value={w.id}>{w.nama}</SelectItem>
+                                        {warehouses.map(w => (
+                                            <SelectItem key={w.id} value={w.id}>{w.nama} ({w.cabang?.nama})</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -216,8 +212,8 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {dummyWarehouses.map(w => (
-                                                <SelectItem key={w.id} value={w.id}>{w.nama}</SelectItem>
+                                            {warehouses.map(w => (
+                                                <SelectItem key={w.id} value={w.id}>{w.nama} ({w.cabang?.nama})</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>

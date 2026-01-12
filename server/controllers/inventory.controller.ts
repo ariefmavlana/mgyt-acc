@@ -53,94 +53,76 @@ export const recordMovement = async (req: Request, res: Response) => {
         const result = await prisma.$transaction(async (tx) => {
             const results = [];
 
-            for (const item of validatedData.items) {
-                // 1. Get Product & Persediaan Info
-                const product = await tx.produk.findUnique({
-                    where: { id: item.produkId },
-                    include: { persediaan: true }
-                });
+            // 1. PRE-FETCH ALL PRODUCTS
+            const productIds = validatedData.items.map(i => i.produkId);
+            const products = await tx.produk.findMany({
+                where: { id: { in: productIds } },
+                include: { persediaan: true }
+            });
+            const productMap = new Map(products.map(p => [p.id, p]));
 
+            // 2. PRE-FETCH ALL RELEVANT STOCK
+            const persediaanIds = products.filter(p => !!p.persediaanId).map(p => p.persediaanId!);
+            const warehouseIds = [validatedData.gudangId];
+            if (validatedData.tipe === 'TRANSFER') {
+                warehouseIds.push(validatedData.gudangTujuanId!);
+            }
+
+            const currentStocks = await tx.stokPersediaan.findMany({
+                where: {
+                    persediaanId: { in: persediaanIds },
+                    gudangId: { in: warehouseIds }
+                }
+            });
+
+            const stockMap = new Map(currentStocks.map(s => [`${s.persediaanId}_${s.gudangId}`, Number(s.kuantitas)]));
+
+            // 3. PREPARE BATCH ITEMS FOR SERVICE
+            const timestamp = Date.now();
+
+            for (const item of validatedData.items) {
+                const product = productMap.get(item.produkId);
                 if (!product || !product.persediaanId) {
                     throw new Error(`Produk ID ${item.produkId} tidak valid atau tidak memiliki data persediaan`);
                 }
 
                 const persediaanId = product.persediaanId;
                 const costPrice = product.persediaan ? Number(product.persediaan.hargaBeli) : 0;
-
-                // LOGIC HANDLE NEGATIVE ADJUSTMENT
-                // If Adjustment and Qty < 0 -> Treat as OUT
-                // If Adjustment and Qty > 0 -> Treat as IN
-
                 const absQty = Math.abs(item.kuantitas);
 
                 if (validatedData.tipe === 'TRANSFER') {
-                    // === TRANSFER LOGIC (ATOMIC OUT + IN) ===
                     const targetGudangId = validatedData.gudangTujuanId!;
 
-                    // 1. CHECK SOURCE STOCK
-                    const currentStock = await tx.stokPersediaan.findUnique({
-                        where: {
-                            persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId }
-                        }
-                    });
-                    const currentQty = currentStock ? Number(currentStock.kuantitas) : 0;
+                    // Check Source Stock
+                    const currentQty = stockMap.get(`${persediaanId}_${validatedData.gudangId}`) || 0;
                     if (currentQty < absQty) {
                         throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk} di gudang asal. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
                     }
 
-                    // 2. DECREMENT SOURCE
-                    await tx.stokPersediaan.upsert({
-                        where: { persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId } },
-                        create: {
-                            persediaanId, gudangId: validatedData.gudangId,
-                            kuantitas: -absQty, nilaiStok: -absQty * costPrice,
-                        },
-                        update: { kuantitas: { decrement: absQty } }
+                    // TRANSFER OUT
+                    await InventoryService.removeStock(tx as any, {
+                        persediaanId,
+                        gudangId: validatedData.gudangId,
+                        qty: absQty,
+                        refType: 'TRANSFER_OUT',
+                        refId: `MUT-${timestamp}-OUT`,
+                        tanggal: new Date(validatedData.tanggal),
+                        keterangan: validatedData.keterangan || `Transfer ke Gudang ID: ${targetGudangId}`
                     });
 
-                    await tx.mutasiPersediaan.create({
-                        data: {
-                            persediaanId, gudangId: validatedData.gudangId,
-                            nomorMutasi: `MUT-${Date.now()}-OUT`,
-                            tanggal: new Date(validatedData.tanggal),
-                            tipe: 'TRANSFER_OUT',
-                            kuantitas: absQty, harga: costPrice, nilai: absQty * costPrice,
-                            saldoSebelum: currentQty, saldoSesudah: currentQty - absQty,
-                            referensi: validatedData.referensi,
-                            keterangan: validatedData.keterangan || `Transfer ke Gudang ID: ${targetGudangId}` // TODO: Fetch name if possible, or just ID
-                        }
-                    });
-
-                    // 3. INCREMENT TARGET
-                    const currentStockDest = await tx.stokPersediaan.findUnique({
-                        where: { persediaanId_gudangId: { persediaanId, gudangId: targetGudangId } }
-                    });
-                    const beforeQtyDest = currentStockDest ? Number(currentStockDest.kuantitas) : 0;
-
-                    await tx.stokPersediaan.upsert({
-                        where: { persediaanId_gudangId: { persediaanId, gudangId: targetGudangId } },
-                        create: {
-                            persediaanId, gudangId: targetGudangId,
-                            kuantitas: absQty, nilaiStok: absQty * costPrice
-                        },
-                        update: { kuantitas: { increment: absQty } }
-                    });
-
-                    await tx.mutasiPersediaan.create({
-                        data: {
-                            persediaanId, gudangId: targetGudangId,
-                            nomorMutasi: `MUT-${Date.now()}-IN`,
-                            tanggal: new Date(validatedData.tanggal),
-                            tipe: 'TRANSFER_IN',
-                            kuantitas: absQty, harga: costPrice, nilai: absQty * costPrice,
-                            saldoSebelum: beforeQtyDest, saldoSesudah: beforeQtyDest + absQty,
-                            referensi: validatedData.referensi,
-                            keterangan: validatedData.keterangan || `Transfer dari Gudang ID: ${validatedData.gudangId}`
-                        }
+                    // TRANSFER IN
+                    await InventoryService.addStock(tx as any, {
+                        persediaanId,
+                        gudangId: targetGudangId,
+                        qty: absQty,
+                        costPerUnit: costPrice,
+                        refType: 'TRANSFER_IN',
+                        refId: `MUT-${timestamp}-IN`,
+                        tanggal: new Date(validatedData.tanggal),
+                        keterangan: validatedData.keterangan || `Transfer dari Gudang ID: ${validatedData.gudangId}`
                     });
 
                 } else {
-                    // === NORMAL IN/OUT/ADJUSTMENT LOGIC ===
                     let isDecrement = false;
                     if (validatedData.tipe === 'ADJUSTMENT' && item.kuantitas < 0) {
                         isDecrement = true;
@@ -149,97 +131,30 @@ export const recordMovement = async (req: Request, res: Response) => {
                     }
 
                     if (isDecrement) {
-                        // CHECK STOCK
-                        const currentStock = await tx.stokPersediaan.findUnique({
-                            where: {
-                                persediaanId_gudangId: {
-                                    persediaanId,
-                                    gudangId: validatedData.gudangId
-                                }
-                            }
-                        });
-                        const currentQty = currentStock ? Number(currentStock.kuantitas) : 0;
+                        const currentQty = stockMap.get(`${persediaanId}_${validatedData.gudangId}`) || 0;
                         if (currentQty < absQty) {
                             throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk}. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
                         }
 
-                        // DECREMENT
-                        await tx.stokPersediaan.upsert({
-                            where: {
-                                persediaanId_gudangId: { persediaanId, gudangId: validatedData.gudangId }
-                            },
-                            create: {
-                                persediaanId,
-                                gudangId: validatedData.gudangId,
-                                kuantitas: -absQty,
-                                nilaiStok: -absQty * costPrice,
-                            },
-                            update: {
-                                kuantitas: { decrement: absQty }
-                            }
+                        await InventoryService.removeStock(tx as any, {
+                            persediaanId,
+                            gudangId: validatedData.gudangId,
+                            qty: absQty,
+                            refType: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT' : 'KELUAR',
+                            refId: `MUT-${timestamp}`,
+                            tanggal: new Date(validatedData.tanggal),
+                            keterangan: validatedData.keterangan || 'Pengurangan Stok'
                         });
-
-                        // LOG
-                        await tx.mutasiPersediaan.create({
-                            data: {
-                                persediaanId,
-                                gudangId: validatedData.gudangId,
-                                nomorMutasi: `MUT-${Date.now()}`,
-                                tanggal: new Date(validatedData.tanggal),
-                                tipe: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT_OUT' : 'KELUAR',
-                                kuantitas: absQty,
-                                harga: costPrice,
-                                nilai: absQty * costPrice,
-                                saldoSebelum: currentQty,
-                                saldoSesudah: currentQty - absQty,
-                                referensi: validatedData.referensi,
-                                keterangan: validatedData.keterangan || 'Pengurangan Stok'
-                            }
-                        });
-
                     } else {
-                        // INCREMENT (MASUK, ADJUSTMENT POSITIVE)
-                        const targetGudangId = validatedData.gudangId;
-
-                        const currentStockDest = await tx.stokPersediaan.findUnique({
-                            where: {
-                                persediaanId_gudangId: { persediaanId, gudangId: targetGudangId }
-                            }
-                        });
-                        const beforeQty = currentStockDest ? Number(currentStockDest.kuantitas) : 0;
-
-                        // Increment
-                        await tx.stokPersediaan.upsert({
-                            where: {
-                                persediaanId_gudangId: { persediaanId, gudangId: targetGudangId }
-                            },
-                            create: {
-                                persediaanId,
-                                gudangId: targetGudangId,
-                                kuantitas: absQty,
-                                nilaiStok: absQty * costPrice
-                            },
-                            update: {
-                                kuantitas: { increment: absQty }
-                            }
-                        });
-
-                        // Log
-                        await tx.mutasiPersediaan.create({
-                            data: {
-                                persediaanId,
-                                gudangId: targetGudangId,
-                                nomorMutasi: `MUT-${Date.now()}-IN`,
-                                tanggal: new Date(validatedData.tanggal),
-                                tipe: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT_IN' : 'MASUK',
-                                kuantitas: absQty,
-                                harga: costPrice,
-                                nilai: absQty * costPrice,
-                                saldoSebelum: beforeQty,
-                                saldoSesudah: beforeQty + absQty,
-                                referensi: validatedData.referensi,
-                                keterangan: validatedData.keterangan || 'Penambahan Stok'
-                            }
+                        await InventoryService.addStock(tx as any, {
+                            persediaanId,
+                            gudangId: validatedData.gudangId,
+                            qty: absQty,
+                            costPerUnit: costPrice,
+                            refType: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT' : 'MASUK',
+                            refId: `MUT-${timestamp}-IN`,
+                            tanggal: new Date(validatedData.tanggal),
+                            keterangan: validatedData.keterangan || 'Penambahan Stok'
                         });
                     }
                 }

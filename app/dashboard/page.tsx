@@ -40,7 +40,7 @@ export default function DashboardPage() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {/* Revenue */}
-                <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-100">
+                <Card className="bg-linear-to-br from-indigo-50 to-white border-indigo-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-indigo-700">Total Pendapatan</CardTitle>
                         <DollarSign className="h-4 w-4 text-indigo-600" />
@@ -54,7 +54,7 @@ export default function DashboardPage() {
                 </Card>
 
                 {/* Expenses */}
-                <Card className="bg-gradient-to-br from-rose-50 to-white border-rose-100">
+                <Card className="bg-linear-to-br from-rose-50 to-white border-rose-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-rose-700">Total Beban</CardTitle>
                         <TrendingDown className="h-4 w-4 text-rose-600" />
@@ -68,7 +68,7 @@ export default function DashboardPage() {
                 </Card>
 
                 {/* Net Profit */}
-                <Card className="bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+                <Card className="bg-linear-to-br from-emerald-50 to-white border-emerald-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-emerald-700">Laba Bersih</CardTitle>
                         <TrendingUp className="h-4 w-4 text-emerald-600" />
@@ -82,7 +82,7 @@ export default function DashboardPage() {
                 </Card>
 
                 {/* Active Users/Pending Approvals Mix */}
-                <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-100">
+                <Card className="bg-linear-to-br from-amber-50 to-white border-amber-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-amber-700">Pending Approval</CardTitle>
                         <Activity className="h-4 w-4 text-amber-600" />

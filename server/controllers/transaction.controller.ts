@@ -1,6 +1,6 @@
 
 import { Request, Response } from 'express';
-import { PrismaClient, Prisma, TipeTransaksi } from '@prisma/client';
+import { Prisma, TipeTransaksi } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { createTransactionSchema } from '../validators/transaction.validator';
 import { AccountingEngine } from '../lib/accounting-engine';
@@ -191,16 +191,28 @@ export const createTransaction = async (req: Request, res: Response) => {
                 }
             });
 
+            // PRE-FETCH ACCOUNTS FOR BALANCE UPDATES
+            const accountIds = validatedData.items.map((i: any) => i.akunId);
+            const accounts = await tx.chartOfAccounts.findMany({
+                where: { id: { in: accountIds } }
+            });
+            const accountMap = new Map(accounts.map(a => [a.id, a]));
+
+            const balanceUpdates: Record<string, number> = {};
+
             for (const [index, item] of validatedData.items.entries()) {
                 const amount = item.debit > 0 ? item.debit : item.kredit;
                 const type = item.debit > 0 ? 'DEBIT' : 'KREDIT';
+                const account = accountMap.get(item.akunId);
 
-                const { saldoSebelum, saldoSesudah } = await engine.updateBalance(
-                    perusahaanId,
-                    item.akunId,
-                    amount,
-                    type as 'DEBIT' | 'KREDIT'
-                );
+                if (!account) throw new Error(`Akun ID ${item.akunId} tidak ditemukan`);
+
+                const change = type === 'DEBIT' ? amount : -amount;
+                const saldoSebelum = Number(account.saldoBerjalan);
+                const currentAggregatedChange = balanceUpdates[item.akunId] || 0;
+
+                // Track aggregated change for DB update at the end
+                balanceUpdates[item.akunId] = currentAggregatedChange + change;
 
                 await tx.jurnalDetail.create({
                     data: {
@@ -210,9 +222,17 @@ export const createTransaction = async (req: Request, res: Response) => {
                         deskripsi: item.deskripsi || validatedData.deskripsi,
                         debit: item.debit,
                         kredit: item.kredit,
-                        saldoSebelum,
-                        saldoSesudah
+                        saldoSebelum: saldoSebelum + currentAggregatedChange,
+                        saldoSesudah: saldoSebelum + currentAggregatedChange + change
                     }
+                });
+            }
+
+            // Perform aggregated balance updates
+            for (const [accId, netAmount] of Object.entries(balanceUpdates)) {
+                await tx.chartOfAccounts.update({
+                    where: { id: accId },
+                    data: { saldoBerjalan: { increment: netAmount } }
                 });
             }
 
@@ -336,19 +356,30 @@ export const voidTransaction = async (req: Request, res: Response) => {
                     }
                 });
 
-                for (const [index, jd] of originalJournal.detail.entries()) {
+                // PRE-FETCH ACCOUNTS FOR REVERSAL
+                const originalJournalDetail = originalJournal.detail;
+                const reversalAccountIds = originalJournalDetail.map((jd: any) => jd.akunId);
+                const reversalAccounts = await tx.chartOfAccounts.findMany({
+                    where: { id: { in: reversalAccountIds } }
+                });
+                const reversalAccountMap = new Map(reversalAccounts.map(a => [a.id, a]));
+                const reversalBalanceUpdates: Record<string, number> = {};
+
+                for (const [index, jd] of originalJournalDetail.entries()) {
                     // Flip Debit and Credit
                     const debit = jd.kredit;
                     const kredit = jd.debit;
                     const amount = Number(debit) > 0 ? Number(debit) : Number(kredit);
                     const type = Number(debit) > 0 ? 'DEBIT' : 'KREDIT';
 
-                    const { saldoSebelum, saldoSesudah } = await engine.updateBalance(
-                        perusahaanId,
-                        jd.akunId,
-                        amount,
-                        type as 'DEBIT' | 'KREDIT'
-                    );
+                    const account = reversalAccountMap.get(jd.akunId);
+                    if (!account) throw new Error(`Akun ID ${jd.akunId} tidak ditemukan untuk pembalikan`);
+
+                    const change = type === 'DEBIT' ? amount : -amount;
+                    const saldoSebelum = Number(account.saldoBerjalan);
+                    const currentAggregatedChange = reversalBalanceUpdates[jd.akunId] || 0;
+
+                    reversalBalanceUpdates[jd.akunId] = currentAggregatedChange + change;
 
                     await tx.jurnalDetail.create({
                         data: {
@@ -358,9 +389,17 @@ export const voidTransaction = async (req: Request, res: Response) => {
                             deskripsi: `PEMBALIKAN: ${jd.deskripsi}`,
                             debit,
                             kredit,
-                            saldoSebelum,
-                            saldoSesudah
+                            saldoSebelum: saldoSebelum + currentAggregatedChange,
+                            saldoSesudah: saldoSebelum + currentAggregatedChange + change
                         }
+                    });
+                }
+
+                // Apply aggregated reversal updates
+                for (const [accId, netAmount] of Object.entries(reversalBalanceUpdates)) {
+                    await tx.chartOfAccounts.update({
+                        where: { id: accId },
+                        data: { saldoBerjalan: { increment: netAmount } }
                     });
                 }
             }

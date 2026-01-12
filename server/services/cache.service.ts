@@ -1,8 +1,11 @@
 import Redis from 'ioredis';
+import { redis as upstashRedis } from '../../lib/redis';
 
 class CacheService {
     private redis: Redis | null = null;
+    private upstash: typeof upstashRedis | null = null;
     private isEnabled = false;
+    private mode: 'ioredis' | 'upstash' | 'none' = 'none';
 
     constructor() {
         if (process.env.REDIS_URL) {
@@ -18,17 +21,24 @@ class CacheService {
                 this.redis.on('error', (err) => {
                     console.warn('[Cache] Redis connection error, caching disabled:', err.message);
                     this.isEnabled = false;
+                    this.mode = 'none';
                 });
 
                 this.redis.on('connect', () => {
-                    console.log('[Cache] Redis connected');
+                    console.log('[Cache] Redis connected (ioredis)');
                     this.isEnabled = true;
+                    this.mode = 'ioredis';
                 });
             } catch (error) {
                 console.warn('[Cache] Failed to initialize Redis:', error);
             }
+        } else if (process.env.UPSTASH_REDIS_REST_URL) {
+            this.upstash = upstashRedis;
+            this.isEnabled = true;
+            this.mode = 'upstash';
+            console.log('[Cache] Using Upstash REST client');
         } else {
-            console.log('[Cache] No REDIS_URL provided, caching disabled.');
+            console.log('[Cache] No Redis credentials provided, caching disabled.');
         }
     }
 
@@ -36,10 +46,15 @@ class CacheService {
      * Get value from cache using a key
      */
     async get<T>(key: string): Promise<T | null> {
-        if (!this.isEnabled || !this.redis) return null;
+        if (!this.isEnabled) return null;
         try {
-            const data = await this.redis.get(key);
-            return data ? JSON.parse(data) : null;
+            if (this.mode === 'ioredis' && this.redis) {
+                const data = await this.redis.get(key);
+                return data ? JSON.parse(data) : null;
+            } else if (this.mode === 'upstash' && this.upstash) {
+                return await this.upstash.get<T>(key);
+            }
+            return null;
         } catch (error) {
             return null;
         }
@@ -49,13 +64,21 @@ class CacheService {
      * Set value in cache with optional TTL (seconds)
      */
     async set(key: string, value: any, ttl?: number): Promise<void> {
-        if (!this.isEnabled || !this.redis) return;
+        if (!this.isEnabled) return;
         try {
-            const serialized = JSON.stringify(value);
-            if (ttl) {
-                await this.redis.set(key, serialized, 'EX', ttl);
-            } else {
-                await this.redis.set(key, serialized);
+            if (this.mode === 'ioredis' && this.redis) {
+                const serialized = JSON.stringify(value);
+                if (ttl) {
+                    await this.redis.set(key, serialized, 'EX', ttl);
+                } else {
+                    await this.redis.set(key, serialized);
+                }
+            } else if (this.mode === 'upstash' && this.upstash) {
+                if (ttl) {
+                    await this.upstash.set(key, value, { ex: ttl });
+                } else {
+                    await this.upstash.set(key, value);
+                }
             }
         } catch (error) {
             console.warn(`[Cache] Set failed for key ${key}`, error);
@@ -66,8 +89,12 @@ class CacheService {
      * Delete value from cache
      */
     async del(key: string): Promise<void> {
-        if (!this.isEnabled || !this.redis) return;
-        await this.redis.del(key);
+        if (!this.isEnabled) return;
+        if (this.mode === 'ioredis' && this.redis) {
+            await this.redis.del(key);
+        } else if (this.mode === 'upstash' && this.upstash) {
+            await this.upstash.del(key);
+        }
     }
 
     /**
@@ -95,8 +122,12 @@ class CacheService {
      * Clear all cache (flushdb)
      */
     async clear(): Promise<void> {
-        if (!this.isEnabled || !this.redis) return;
-        await this.redis.flushdb();
+        if (!this.isEnabled) return;
+        if (this.mode === 'ioredis' && this.redis) {
+            await this.redis.flushdb();
+        } else if (this.mode === 'upstash' && this.upstash) {
+            await this.upstash.flushdb();
+        }
     }
 }
 

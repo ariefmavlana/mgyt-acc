@@ -5,7 +5,8 @@ import {
     createCompany,
     updateCompany,
     deleteCompany,
-    updateSettings
+    updateSettings,
+    getWarehouses
 } from '../controllers/company.controller';
 import { protect } from '../middleware/auth.middleware';
 
@@ -19,5 +20,6 @@ router.post('/', createCompany);
 router.put('/:id', updateCompany);
 router.delete('/:id', deleteCompany);
 router.post('/:id/settings', updateSettings);
+router.get('/warehouses', getWarehouses);
 
 export default router;

@@ -20,17 +20,29 @@ export const createPurchase = async (req: Request, res: Response) => {
 
             const month = tanggal.getMonth() + 1;
             const year = tanggal.getFullYear();
-
-            // 2. Transaksi Numbering
             const transNo = validatedData.nomorTransaksi || `BILL/${year}/${month}/${Date.now().toString().slice(-4)}`;
 
-            // 3. Find or Create Period
-            let period = await tx.periodeAkuntansi.findFirst({
-                where: { perusahaanId, bulan: month, tahun: year, status: 'TERBUKA' }
-            });
+            // 2. PRE-FETCH DATA
+            const productIds = validatedData.items.filter(i => i.produkId).map(i => i.produkId!);
+
+            const [products, periodResolved, warehouseResolved] = await Promise.all([
+                tx.produk.findMany({
+                    where: { id: { in: productIds } },
+                    include: { persediaan: true }
+                }),
+                tx.periodeAkuntansi.findFirst({
+                    where: { perusahaanId, bulan: month, tahun: year, status: 'TERBUKA' }
+                }),
+                validatedData.gudangId ? Promise.resolve({ id: validatedData.gudangId }) : tx.gudang.findFirst({
+                    where: { cabang: { perusahaanId }, isUtama: true }
+                })
+            ]);
+
+            const productMap = new Map(products.map(p => [p.id, p]));
+            let period = periodResolved;
+            let warehouseId = warehouseResolved?.id;
 
             if (!period) {
-                // Auto create period if needed (or throw error in strict mode)
                 period = await tx.periodeAkuntansi.create({
                     data: {
                         perusahaanId: perusahaanId!,
@@ -44,56 +56,34 @@ export const createPurchase = async (req: Request, res: Response) => {
                 });
             }
 
-            // 4. Warehouse Resolution
-            const warehouseId = validatedData.gudangId || (await tx.gudang.findFirst({ where: { cabang: { perusahaanId }, isUtama: true } }))?.id;
-
-            if (validatedData.items.some(i => i.produkId) && !warehouseId) {
-                throw new Error("Gudang tidak ditemukan. Harap pilih gudang untuk pembelian stok.");
+            if (productIds.length > 0 && !warehouseId) {
+                const fallbackWarehouse = await tx.gudang.findFirst({ where: { cabang: { perusahaanId } } });
+                if (!fallbackWarehouse) throw new Error("Gudang tidak ditemukan.");
+                warehouseId = fallbackWarehouse.id;
             }
 
-            // 5. Calculate Linkage & Totals
-            let subtotal = 0;
+            // 3. Inventory Processing (Batch Prepare)
+            const inventoryBatchAddItems: { persediaanId: string, gudangId: string, qty: number, costPerUnit: number }[] = [];
             const detailItems = [];
 
             for (const [idx, item] of validatedData.items.entries()) {
                 const amount = item.kuantitas * item.hargaSatuan - (item.diskon || 0);
-                subtotal += amount;
 
-                // Inventory Processing
                 if (item.produkId) {
-                    const product = await tx.produk.findUnique({
-                        where: { id: item.produkId },
-                        include: { persediaan: true }
-                    });
+                    const prod = productMap.get(item.produkId);
+                    if (!prod?.persediaanId) throw new Error(`Produk tidak valid untuk item index ${idx}`);
 
-                    if (!product || !product.persediaanId) {
-                        throw new Error(`Produk tidak valid untuk item index ${idx}`);
-                    }
-
-                    // Add Stock (FIFO Layer)
-                    await InventoryService.addStock(tx, {
-                        persediaanId: product.persediaanId,
+                    inventoryBatchAddItems.push({
+                        persediaanId: prod.persediaanId,
                         gudangId: warehouseId!,
                         qty: item.kuantitas,
-                        costPerUnit: item.hargaSatuan,
-                        refType: 'PURCHASE',
-                        refId: transNo,
-                        tanggal,
-                        keterangan: `Pembelian Bill ${transNo}`
+                        costPerUnit: item.hargaSatuan
                     });
-
-                    // Optional: Update Master Buy Price
-                    if (product.persediaan) {
-                        await tx.persediaan.update({
-                            where: { id: product.persediaanId },
-                            data: { hargaBeli: item.hargaSatuan }
-                        });
-                    }
                 }
 
                 detailItems.push({
                     urutan: idx + 1,
-                    akunId: item.akunId, // Use provided account (Asset/Expense)
+                    akunId: item.akunId,
                     deskripsi: item.deskripsi || `Item ${idx + 1}`,
                     kuantitas: item.kuantitas,
                     hargaSatuan: item.hargaSatuan,
@@ -102,9 +92,27 @@ export const createPurchase = async (req: Request, res: Response) => {
                 });
             }
 
-            const total = subtotal;
+            // 4. Batch Inventory Add
+            if (inventoryBatchAddItems.length > 0) {
+                await InventoryService.batchAddStock(tx as any, inventoryBatchAddItems, {
+                    refType: 'PURCHASE',
+                    refId: transNo,
+                    tanggal,
+                    keterangan: `Pembelian Bill ${transNo}`
+                });
 
-            // 6. Create Transaksi (PEMBELIAN)
+                // Batch Update Master Buy Prices
+                for (const item of inventoryBatchAddItems) {
+                    await tx.persediaan.update({
+                        where: { id: item.persediaanId },
+                        data: { hargaBeli: item.costPerUnit }
+                    });
+                }
+            }
+
+            const total = detailItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+            // 5. Create Transaksi
             const transaksi = await tx.transaksi.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -116,11 +124,11 @@ export const createPurchase = async (req: Request, res: Response) => {
                     tipe: 'PEMBELIAN',
                     deskripsi: validatedData.catatan || `Pembelian ${transNo}`,
                     referensi: validatedData.referensi,
-                    subtotal,
-                    total,
+                    subtotal: total,
+                    total: total,
                     sisaPembayaran: total,
                     statusPembayaran: 'BELUM_DIBAYAR',
-                    pemasokId: validatedData.pemasokId, // Linked to Supplier
+                    pemasokId: validatedData.pemasokId,
                     isPosted: true,
                     postedAt: new Date(),
                     postedBy: authReq.user.username,
@@ -138,7 +146,7 @@ export const createPurchase = async (req: Request, res: Response) => {
                 }
             });
 
-            // 7. Create Hutang (Accounts Payable)
+            // 6. Hutang & Voucher
             await tx.hutang.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -154,26 +162,12 @@ export const createPurchase = async (req: Request, res: Response) => {
                 }
             });
 
-            // 8. Find AP Account
             const apAccount = await tx.chartOfAccounts.findFirst({
-                where: {
-                    perusahaanId,
-                    tipe: 'KEWAJIBAN',
-                    kategoriAkun: 'HUTANG_USAHA' // Check enum exact match later
-                }
-            });
-            // Fallback if generic category not found, try code or name logic?
-            // For now assume standard setup exists. If not, user needs to setup COA.
+                where: { perusahaanId, tipe: 'KEWAJIBAN', kategoriAkun: 'HUTANG_USAHA' }
+            }) || await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'KEWAJIBAN' } });
 
-            if (!apAccount) {
-                // Try finding ANY liability account if specific not found (dangerous but reduces friction)
-                // Better to throw
-                const fallback = await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'KEWAJIBAN' } });
-                if (!fallback) throw new Error('Akun Hutang Usaha tidak ditemukan');
-            }
-            const activeApAccount = apAccount || (await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'KEWAJIBAN' } }))!;
+            if (!apAccount) throw new Error('Akun Hutang Usaha tidak ditemukan');
 
-            // 9. Create Voucher
             const voucher = await tx.voucher.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -182,8 +176,8 @@ export const createPurchase = async (req: Request, res: Response) => {
                     tanggal,
                     tipe: 'JURNAL_UMUM',
                     deskripsi: `Pembelian ${transNo}`,
-                    totalDebit: total, // Inventory/Expense
-                    totalKredit: total, // AP
+                    totalDebit: total,
+                    totalKredit: total,
                     status: 'DIPOSTING',
                     dibuatOlehId: authReq.user.id,
                     isPosted: true,
@@ -192,34 +186,21 @@ export const createPurchase = async (req: Request, res: Response) => {
                 }
             });
 
-            // 10. Voucher Details & Journal
-            // Credit AP
-            await tx.voucherDetail.create({
-                data: {
-                    voucherId: voucher.id,
-                    urutan: 1,
-                    akunId: activeApAccount.id,
-                    deskripsi: `Hutang - ${transNo}`,
-                    debit: 0,
-                    kredit: total
-                }
-            });
-
-            let seq = 2;
-            for (const item of detailItems) {
-                await tx.voucherDetail.create({
-                    data: {
+            // 7. BATCH DETAIL CREATION
+            await tx.voucherDetail.createMany({
+                data: [
+                    { voucherId: voucher.id, urutan: 1, akunId: apAccount.id, deskripsi: `Hutang - ${transNo}`, debit: 0, kredit: total },
+                    ...detailItems.map((item, i) => ({
                         voucherId: voucher.id,
-                        urutan: seq++,
-                        akunId: item.akunId, // Debit Expense/Asset
+                        urutan: i + 2,
+                        akunId: item.akunId,
                         deskripsi: item.deskripsi,
                         debit: item.subtotal,
                         kredit: 0
-                    }
-                });
-            }
+                    }))
+                ]
+            });
 
-            // 11. Create Jurnal Umum
             await tx.jurnalUmum.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -234,14 +215,7 @@ export const createPurchase = async (req: Request, res: Response) => {
                     postedAt: new Date(),
                     detail: {
                         create: [
-                            {
-                                urutan: 1,
-                                akunId: activeApAccount.id,
-                                deskripsi: `Hutang - ${transNo}`,
-                                debit: 0,
-                                kredit: total,
-                                saldoSesudah: 0
-                            },
+                            { urutan: 1, akunId: apAccount.id, deskripsi: `Hutang - ${transNo}`, debit: 0, kredit: total, saldoSesudah: 0 },
                             ...detailItems.map((item, i) => ({
                                 urutan: i + 2,
                                 akunId: item.akunId,
@@ -255,42 +229,21 @@ export const createPurchase = async (req: Request, res: Response) => {
                 }
             });
 
-            // 12. Update Account Balances
-            // AP (Credit) -> Increase Liability
-            await tx.chartOfAccounts.update({
-                where: { id: activeApAccount.id },
-                data: { saldoBerjalan: { increment: total } } // Liability Credit increases with increment? 
-                // Wait. 
-                // Liability: Normal Balance Credit.
-                // Incrementing saldoBerjalan usually means adding to the "value". 
-                // If the system tracks strict Debit/Credit signed values, it depends.
-                // Usually: Asset/Expense (Debit Normal) -> +Debit, -Credit.
-                // Liability/Equity/Revenue (Credit Normal) -> +Credit, -Debit.
-                // Check invoice controller:
-                // AR (Asset) -> increment (Debit). Correct.
-                // Revenue (Credit) -> decrement?? 
-                // In Invoice Controller: data: { saldoBerjalan: { decrement: item.subtotal } }
-                // So the system treats `saldoBerjalan` as a signed value where Debit is Positive? 
-                // OR it treats it as "Natural Balance".
-                // If Invoice Revenue is DECREMENTED, handled as Credit.
-                // Then Liability (AP) should be DECREMENTED (Credit)?
-                // Let's verify standard accounting logic in this code base.
-                // Invoice: item (Revenue) credited. `saldoBerjalan: { decrement: item.subtotal }`.
-                // If `saldoBerjalan` tracks Net Debit (Dr - Cr), then Credit decreases it. Correct.
-                // So AP (Liability, Credit) should also be DECREMENTED.
-            });
+            // 8. BATCH BALANCE UPDATES
+            const balanceUpdates: Record<string, number> = {};
 
-            await tx.chartOfAccounts.update({
-                where: { id: activeApAccount.id },
-                data: { saldoBerjalan: { decrement: total } }
-            });
+            // AP -> Decrement (Credit)
+            balanceUpdates[apAccount.id] = (balanceUpdates[apAccount.id] || 0) - total;
 
+            // Purchase Items -> Increment (Debit)
             for (const item of detailItems) {
-                // Item (Asset/Expense) -> Debit.
-                // Increases Net Debit.
+                balanceUpdates[item.akunId] = (balanceUpdates[item.akunId] || 0) + item.subtotal;
+            }
+
+            for (const [accId, amount] of Object.entries(balanceUpdates)) {
                 await tx.chartOfAccounts.update({
-                    where: { id: item.akunId },
-                    data: { saldoBerjalan: { increment: item.subtotal } }
+                    where: { id: accId },
+                    data: { saldoBerjalan: { increment: amount } }
                 });
             }
 

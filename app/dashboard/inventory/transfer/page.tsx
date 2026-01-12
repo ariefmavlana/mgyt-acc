@@ -261,7 +261,7 @@ export default function WarehouseTransferPage() {
                         </div>
 
                         <div className="pt-4 flex justify-end">
-                            <Button size="lg" disabled={submitting || !selectedProduct} className="w-full md:w-auto min-w-[200px]">
+                            <Button type="submit" size="lg" disabled={submitting || !selectedProduct} className="w-full md:w-auto min-w-[200px]">
                                 {submitting ? 'Memproses Transfer...' : (
                                     <>
                                         <ArrowRightLeft className="mr-2 h-4 w-4" />

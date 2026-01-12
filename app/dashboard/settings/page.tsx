@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Building2, Users, Settings, Shield, Save, Loader2 } from 'lucide-react';
 import { useCompany } from '@/hooks/use-company';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
     const { user } = useRequireAuth();
@@ -46,7 +47,24 @@ export default function SettingsPage() {
         if (!companyId) return;
         try {
             setIsSaving(true);
-            await updateCompanyFn(companyId, form);
+
+            // Clean payload: remove empty strings to avoid Zod validation errors (e.g. min(5))
+            // and ensure we don't send invalid data formats
+            const payload: any = { ...form };
+
+            Object.keys(payload).forEach(key => {
+                if (payload[key] === '') {
+                    // For now, we remove the key so it doesn't update (keeps existing value)
+                    // If we need to clear (set to null), the validator needs .nullable() and we send null
+                    delete payload[key];
+                }
+            });
+
+            await updateCompanyFn(companyId, payload);
+            toast.success('Profil perusahaan berhasil diperbarui');
+        } catch (error) {
+            console.error(error);
+            toast.error('Gagal memperbarui profil perusahaan');
         } finally {
             setIsSaving(false);
         }
@@ -114,8 +132,15 @@ export default function SettingsPage() {
                             </div>
                             <div className="flex justify-end">
                                 <Button
+                                    type="button"
                                     className="bg-primary hover:bg-primary/90"
-                                    onClick={handleSave}
+                                    onClick={() => {
+                                        if (!companyId) {
+                                            toast.error('Data perusahaan tidak ditemukan');
+                                            return;
+                                        }
+                                        handleSave();
+                                    }}
                                     disabled={isSaving}
                                 >
                                     {isSaving ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}

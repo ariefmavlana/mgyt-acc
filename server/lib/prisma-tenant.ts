@@ -4,7 +4,11 @@ import { getTenantContext } from './tenant-context';
 // List of models that should NOT be filtered by perusahaanId
 const EXCLUDED_MODELS = [
     'MataUang', 'KursHistory', 'Pengguna', 'RefreshToken', 'PasswordHistory',
-    'Perusahaan', 'AksesPengguna'
+    'Perusahaan', 'AksesPengguna',
+    // Models without direct perusahaanId field or system logs
+    'JurnalDetail', 'VoucherDetail', 'TransaksiDetail', 'ProdukVariant',
+    'BudgetDetail', 'ProyekTransaksi', 'Gudang', 'StokPersediaan',
+    'MutasiPersediaan', 'InventoryLayer', 'AssetFixed', 'JejakAudit'
 ];
 
 export const tenantExtension = Prisma.defineExtension((client) => {

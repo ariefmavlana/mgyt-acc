@@ -2,12 +2,16 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
-import { TipeAkun } from '@prisma/client';
+import { TipeAkun, KategoriAset } from '@prisma/client';
 
 export const getDashboardStats = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const perusahaanId = authReq.currentCompanyId!;
+        const perusahaanId = authReq.currentCompanyId;
+
+        if (!perusahaanId) {
+            return res.status(400).json({ message: 'Context perusahaan tidak ditemukan' });
+        }
 
         // 1. Calculate Revenue (PENDAPATAN) - Normal Balance: CREDIT
         const revenueAgg = await prisma.jurnalDetail.aggregate({
@@ -18,11 +22,11 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             where: {
                 jurnal: {
                     perusahaanId,
-                    isPosted: true // Only count posted journals
+                    isPosted: true
                 },
                 akun: {
                     tipe: {
-                        in: ['PENDAPATAN', 'PENDAPATAN_KOMPREHENSIF_LAIN']
+                        in: [TipeAkun.PENDAPATAN, TipeAkun.PENDAPATAN_KOMPREHENSIF_LAIN]
                     }
                 }
             }
@@ -41,7 +45,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                     isPosted: true
                 },
                 akun: {
-                    tipe: 'BEBAN'
+                    tipe: TipeAkun.BEBAN
                 }
             }
         });
@@ -66,8 +70,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             }
         });
 
-        // 6. Cash Balance (KAS_DAN_SETARA_KAS)
-        // This gives a quick snapshot of liquidity
+        // 6. Cash Balance
         const cashAgg = await prisma.jurnalDetail.aggregate({
             _sum: {
                 debit: true,
@@ -79,7 +82,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                     isPosted: true
                 },
                 akun: {
-                    kategoriAset: 'KAS_DAN_SETARA_KAS'
+                    kategoriAset: KategoriAset.KAS_DAN_SETARA_KAS
                 }
             }
         });
@@ -94,8 +97,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             cashBalance
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Dashboard Stats Error:', error);
-        res.status(500).json({ message: 'Gagal memuat statistik dashboard' });
+        // Return explicit error details for debugging
+        res.status(500).json({
+            message: 'Gagal memuat statistik dashboard',
+            debug: error.message
+        });
     }
 };

@@ -29,14 +29,27 @@ export const createInvoice = async (req: Request, res: Response) => {
 
             const month = tanggal.getMonth() + 1;
             const year = tanggal.getFullYear();
-
-            // 2. Transaksi Numbering
             const invNo = validatedData.nomorInvoice || `INV/${year}/${month}/${Date.now().toString().slice(-4)}`;
 
-            // 3. Find or Create Period
-            let period = await tx.periodeAkuntansi.findFirst({
-                where: { perusahaanId, bulan: month, tahun: year, status: 'TERBUKA' }
-            });
+            // 2. PRE-FETCH DATA
+            const productIds = validatedData.items.filter(i => i.produkId).map(i => i.produkId!);
+
+            const [products, periodResolved, warehouseResolved] = await Promise.all([
+                tx.produk.findMany({
+                    where: { id: { in: productIds } },
+                    include: { persediaan: true }
+                }),
+                tx.periodeAkuntansi.findFirst({
+                    where: { perusahaanId, bulan: month, tahun: year, status: 'TERBUKA' }
+                }),
+                validatedData.gudangId ? Promise.resolve({ id: validatedData.gudangId }) : tx.gudang.findFirst({
+                    where: { cabang: { perusahaanId }, isUtama: true }
+                })
+            ]);
+
+            const productMap = new Map(products.map(p => [p.id, p]));
+            let period = periodResolved;
+            let warehouseId = warehouseResolved?.id;
 
             if (!period) {
                 period = await tx.periodeAkuntansi.create({
@@ -52,11 +65,31 @@ export const createInvoice = async (req: Request, res: Response) => {
                 });
             }
 
-            // 4. Calculate Totals
+            if (productIds.length > 0 && !warehouseId) {
+                const fallbackWarehouse = await tx.gudang.findFirst({ where: { cabang: { perusahaanId } } });
+                if (!fallbackWarehouse) throw new Error("Gudang tidak ditemukan.");
+                warehouseId = fallbackWarehouse.id;
+            }
+
+            // 3. Calculate Totals & Group Inventory Items
             let subtotal = 0;
+            const inventoryBatchItems: { persediaanId: string, gudangId: string, qty: number }[] = [];
+
             const detailItems = validatedData.items.map((item, idx) => {
                 const amount = item.kuantitas * item.hargaSatuan - (item.diskon || 0);
                 subtotal += amount;
+
+                if (item.produkId) {
+                    const prod = productMap.get(item.produkId);
+                    if (prod?.persediaanId) {
+                        inventoryBatchItems.push({
+                            persediaanId: prod.persediaanId,
+                            gudangId: warehouseId!,
+                            qty: item.kuantitas
+                        });
+                    }
+                }
+
                 return {
                     urutan: idx + 1,
                     akunId: item.akunId,
@@ -68,63 +101,35 @@ export const createInvoice = async (req: Request, res: Response) => {
                 };
             });
 
-            // 4a. Inventory & COGS Processing
+            // 4. Batch Stock Removal & COGS Aggregation
             const inventoryJournalDetails: JournalItem[] = [];
-            // Fix: Gudang relates to Cabang, use nested query for perusahaanId
-            const warehouseId = validatedData.gudangId || (await tx.gudang.findFirst({
-                where: { cabang: { perusahaanId }, isUtama: true }
-            }))?.id;
-
-            if (validatedData.items.some(i => i.produkId) && !warehouseId) {
-                // Try to find any warehouse if strict branch check fails or if not set
-                const anyWarehouse = await tx.gudang.findFirst({
-                    where: { cabang: { perusahaanId } }
+            if (inventoryBatchItems.length > 0) {
+                const cogsResults = await InventoryService.batchRemoveStock(tx as any, inventoryBatchItems, {
+                    refType: 'SALES',
+                    refId: invNo,
+                    tanggal,
+                    keterangan: `Penjualan Invoice ${invNo}`
                 });
-                if (!anyWarehouse) throw new Error("Gudang tidak ditemukan. Harap buat gudang terlebih dahulu.");
-                // We really should enforce warehouse selection, but for now fallback
-            }
 
-            for (const item of validatedData.items) {
-                if (item.produkId) {
-                    const product = await tx.produk.findUnique({
-                        where: { id: item.produkId },
-                        include: { persediaan: true }
-                    });
+                for (const item of validatedData.items) {
+                    if (item.produkId) {
+                        const prod = productMap.get(item.produkId);
+                        const cogs = cogsResults[`${prod?.persediaanId}_${warehouseId}`] || 0;
 
-                    if (!product || !product.persediaanId) {
-                        throw new Error(`Produk tidak valid untuk item: ${item.deskripsi}`);
-                    }
-
-                    // Deduct Stock (FIFO)
-                    // We need a specific warehouse. If not provided, usage of default/main.
-                    const activeGudang = warehouseId!;
-
-                    const cogs = await InventoryService.removeStock(tx as any, {
-                        persediaanId: product.persediaanId,
-                        gudangId: activeGudang,
-                        qty: item.kuantitas,
-                        refType: 'SALES',
-                        refId: invNo, // Use Invoice Number as temp ref, or we can use Transaksi ID later if we move this after creation
-                        tanggal,
-                        keterangan: `Penjualan Invoice ${invNo}`
-                    });
-
-                    // Prepare COGS Journal Legs
-                    if (product.persediaan?.akunHppId && product.persediaan?.akunPersediaanId) {
-                        // DB: COGS (Expense)
-                        inventoryJournalDetails.push({
-                            akunId: product.persediaan.akunHppId,
-                            deskripsi: `HPP - ${item.deskripsi}`,
-                            debit: cogs,
-                            kredit: 0
-                        });
-                        // CR: Inventory (Asset)
-                        inventoryJournalDetails.push({
-                            akunId: product.persediaan.akunPersediaanId,
-                            deskripsi: `Persediaan - ${item.deskripsi}`,
-                            debit: 0,
-                            kredit: cogs
-                        });
+                        if (prod?.persediaan?.akunHppId && prod?.persediaan?.akunPersediaanId) {
+                            inventoryJournalDetails.push({
+                                akunId: prod.persediaan.akunHppId,
+                                deskripsi: `HPP - ${item.deskripsi}`,
+                                debit: cogs,
+                                kredit: 0
+                            });
+                            inventoryJournalDetails.push({
+                                akunId: prod.persediaan.akunPersediaanId,
+                                deskripsi: `Persediaan - ${item.deskripsi}`,
+                                debit: 0,
+                                kredit: cogs
+                            });
+                        }
                     }
                 }
             }
@@ -165,7 +170,7 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 6. Create Piutang
+            // 6. Piutang & Voucher
             await tx.piutang.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -181,7 +186,6 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 7. Create Voucher
             const voucher = await tx.voucher.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -200,46 +204,27 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 8. Find AR account
+            // 7. ACCOUNT UPDATES (BATCH RESOLUTION)
             const arAccount = await tx.chartOfAccounts.findFirst({
-                where: {
-                    perusahaanId,
-                    tipe: 'ASET',
-                    kategoriAset: 'PIUTANG_USAHA'
-                }
+                where: { perusahaanId, tipe: 'ASET', kategoriAset: 'PIUTANG_USAHA' }
             });
+            if (!arAccount) throw new Error('Akun Piutang Usaha tidak ditemukan');
 
-            if (!arAccount) {
-                throw new Error('Akun Piutang Usaha tidak ditemukan');
-            }
-
-            // 9. Voucher Details
-            await tx.voucherDetail.create({
-                data: {
+            // Voucher Details
+            const voucherDetailsData = [
+                { voucherId: voucher.id, urutan: 1, akunId: arAccount.id, deskripsi: `Piutang - ${invNo}`, debit: total, kredit: 0 },
+                ...detailItems.map((item, i) => ({
                     voucherId: voucher.id,
-                    urutan: 1,
-                    akunId: arAccount.id,
-                    deskripsi: `Piutang - ${invNo}`,
-                    debit: total,
-                    kredit: 0
-                }
-            });
+                    urutan: i + 2,
+                    akunId: item.akunId,
+                    deskripsi: item.deskripsi,
+                    debit: 0,
+                    kredit: item.subtotal
+                }))
+            ];
+            await tx.voucherDetail.createMany({ data: voucherDetailsData });
 
-            let seq = 2;
-            for (const item of detailItems) {
-                await tx.voucherDetail.create({
-                    data: {
-                        voucherId: voucher.id,
-                        urutan: seq++,
-                        akunId: item.akunId,
-                        deskripsi: item.deskripsi,
-                        debit: 0,
-                        kredit: item.subtotal
-                    }
-                });
-            }
-
-            // 10. Jurnal Umum
+            // Jurnal Umum
             await tx.jurnalUmum.create({
                 data: {
                     perusahaanId: perusahaanId!,
@@ -254,14 +239,7 @@ export const createInvoice = async (req: Request, res: Response) => {
                     postedAt: new Date(),
                     detail: {
                         create: [
-                            {
-                                urutan: 1,
-                                akunId: arAccount.id,
-                                deskripsi: `Piutang - ${invNo}`,
-                                debit: total,
-                                kredit: 0,
-                                saldoSesudah: 0
-                            },
+                            { urutan: 1, akunId: arAccount.id, deskripsi: `Piutang - ${invNo}`, debit: total, kredit: 0, saldoSesudah: 0 },
                             ...detailItems.map((item, i) => ({
                                 urutan: i + 2,
                                 akunId: item.akunId,
@@ -283,32 +261,33 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            // 11. Update balances
-            await tx.chartOfAccounts.update({
-                where: { id: arAccount.id },
-                data: { saldoBerjalan: { increment: total } }
-            });
+            // 8. BATCH BALANCE UPDATES
+            const balanceUpdates: Record<string, number> = {}; // { accountId: netAmount }
 
+            // AR -> Increment (+total)
+            balanceUpdates[arAccount.id] = (balanceUpdates[arAccount.id] || 0) + total;
+
+            // Sales Items -> Decrement (-subtotal)
             for (const item of detailItems) {
-                await tx.chartOfAccounts.update({
-                    where: { id: item.akunId },
-                    data: { saldoBerjalan: { decrement: item.subtotal } } // Revenue (Credit)
-                });
+                balanceUpdates[item.akunId] = (balanceUpdates[item.akunId] || 0) - item.subtotal;
             }
 
-            // Update COGS and Inventory Accounts
+            // Inventory COGS processing
             for (const item of inventoryJournalDetails) {
                 if (item.debit > 0) {
-                    await tx.chartOfAccounts.update({
-                        where: { id: item.akunId },
-                        data: { saldoBerjalan: { increment: item.debit } } // Expense (Debit)
-                    });
+                    balanceUpdates[item.akunId] = (balanceUpdates[item.akunId] || 0) + item.debit;
                 } else {
-                    await tx.chartOfAccounts.update({
-                        where: { id: item.akunId },
-                        data: { saldoBerjalan: { decrement: item.kredit } } // Asset Decrease (Credit)
-                    });
+                    balanceUpdates[item.akunId] = (balanceUpdates[item.akunId] || 0) - item.kredit;
                 }
+            }
+
+            // Commit all balance updates in individual optimized queries (Prisma doesn't batch updates well by ID)
+            // But we filter by unique ID to avoid redundant hits.
+            for (const [accId, amount] of Object.entries(balanceUpdates)) {
+                await tx.chartOfAccounts.update({
+                    where: { id: accId },
+                    data: { saldoBerjalan: { increment: amount } }
+                });
             }
 
             return transaksi;

@@ -239,6 +239,7 @@ export default function StockOpnamePage() {
 
                     <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
                         <Button
+                            type="button"
                             onClick={handleSubmit}
                             disabled={submitting || stocks.length === 0}
                             className="w-[150px]"

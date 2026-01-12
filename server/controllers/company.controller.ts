@@ -222,3 +222,33 @@ export const updateSettings = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Gagal memperbarui pengaturan' });
     }
 };
+
+export const getWarehouses = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId;
+
+        if (!perusahaanId) {
+            return res.status(400).json({ message: 'Context perusahaan tidak ditemukan' });
+        }
+
+        const warehouses = await prisma.gudang.findMany({
+            where: {
+                cabang: {
+                    perusahaanId: perusahaanId
+                }
+            },
+            include: {
+                cabang: {
+                    select: { nama: true }
+                }
+            },
+            orderBy: { nama: 'asc' }
+        });
+
+        res.json(warehouses);
+    } catch (error) {
+        console.error('Get Warehouses Error:', error);
+        res.status(500).json({ message: 'Gagal mengambil daftar gudang' });
+    }
+};

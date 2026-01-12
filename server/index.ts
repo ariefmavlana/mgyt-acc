@@ -31,6 +31,7 @@ import { tenantMiddleware } from './middleware/tenant.middleware';
 import { auditLog } from './middleware/audit.middleware';
 import auditRoutes from './routes/audit.routes';
 import { protect } from './middleware/auth.middleware';
+import { uploadthingHandler } from './routes/upload.routes';
 
 const dev = process.env.NODE_ENV !== 'production';
 const nextApp = next({ dev });
@@ -115,8 +116,10 @@ nextApp.prepare().then(() => {
 
     // API Routes
     app.use('/api/auth', authRoutes);
+    app.use('/api/uploadthing', uploadthingHandler);
 
-    app.use(doubleCsrfProtection); // Enable globally for protected routes only
+    // Secure all other /api routes with CSRF
+    app.use('/api', doubleCsrfProtection);
 
     // Protected & Tenant isolated routes
     app.use('/api/onboarding', protect, tenantMiddleware, onboardingRoutes);
@@ -159,12 +162,15 @@ nextApp.prepare().then(() => {
     // Error Handling
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     app.use((err: Error & { code?: string }, req: Request, res: Response, _next: NextFunction) => {
-        console.error(err.stack || err);
-
-        // Handle CSRF errors
+        // Handle CSRF errors gracefully
         if (err.code === "EBADCSRFTOKEN") {
+            if (dev) {
+                console.warn(`[CSRF] Invalid token on ${req.method} ${req.url} - (IP: ${req.ip})`);
+            }
             return res.status(403).json({ message: "Invalid CSRF token" });
         }
+
+        console.error(err.stack || err);
 
         res.status(500).json({
             error: 'Internal Server Error',
