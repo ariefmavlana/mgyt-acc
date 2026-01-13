@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { createCompanySchema, updateCompanySchema, settingsSchema } from '../validators/company.validator';
+import { createCompanySchema, updateCompanySchema, settingsSchema, inviteUserSchema } from '../validators/company.validator';
 import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -268,5 +268,144 @@ export const getBranches = async (req: Request, res: Response) => {
     } catch (error: unknown) {
         console.error('Get Branches Error:', error);
         res.status(500).json({ message: 'Gagal mengambil daftar cabang' });
+    }
+};
+
+export const getCompanyUsers = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const { id } = req.params;
+        const perusahaanId = String(id);
+
+        // Verify requestor has access to this company
+        const requesterAccess = await prisma.aksesPengguna.findFirst({
+            where: {
+                penggunaId: authReq.user.id,
+                perusahaanId: perusahaanId,
+                isAktif: true
+            }
+        });
+
+        if (!requesterAccess) {
+            return res.status(403).json({ message: 'Anda tidak memiliki akses ke perusahaan ini' });
+        }
+
+        const users = await prisma.aksesPengguna.findMany({
+            where: {
+                perusahaanId: perusahaanId,
+                isAktif: true
+            },
+            include: {
+                pengguna: {
+                    select: {
+                        id: true,
+                        namaLengkap: true,
+                        email: true,
+                        username: true,
+                        lastLogin: true
+                    }
+                }
+            }
+        });
+
+        const formattedUsers = users.map(u => ({
+            id: u.pengguna.id,
+            nama: u.pengguna.namaLengkap,
+            email: u.pengguna.email,
+            role: u.roleEnum,
+            lastLogin: u.pengguna.lastLogin
+        }));
+
+        res.json(formattedUsers);
+    } catch (error) {
+        console.error('Get Company Users Error:', error);
+        res.status(500).json({ message: 'Gagal mengambil daftar pengguna' });
+    }
+};
+
+export const addUserToCompany = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const { id } = req.params;
+        const validatedBody = inviteUserSchema.parse(req.body);
+
+        // Check if user exists in system
+        const userToAdd = await prisma.pengguna.findUnique({
+            where: { email: validatedBody.email }
+        });
+
+        if (!userToAdd) {
+            return res.status(404).json({ message: 'User dengan email tersebut tidak ditemukan di sistem.' });
+        }
+
+        // Check if already has access
+        const existingAccess = await prisma.aksesPengguna.findFirst({
+            where: {
+                penggunaId: userToAdd.id,
+                perusahaanId: String(id)
+            }
+        });
+
+        if (existingAccess) {
+            if (existingAccess.isAktif) {
+                return res.status(400).json({ message: 'User sudah terdaftar di perusahaan ini.' });
+            } else {
+                // Reactivate
+                await prisma.aksesPengguna.update({
+                    where: { id: existingAccess.id },
+                    data: { isAktif: true, roleEnum: validatedBody.role as any }
+                });
+                return res.json({ message: 'User berhasil diaktifkan kembali.' });
+            }
+        }
+
+        // Create new access
+        await prisma.aksesPengguna.create({
+            data: {
+                penggunaId: userToAdd.id,
+                perusahaanId: String(id),
+                roleEnum: validatedBody.role as any,
+                isAktif: true
+            }
+        });
+
+        res.status(201).json({ message: 'User berhasil ditambahkan.' });
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({ message: error.errors[0].message });
+        }
+        console.error('Add User Error:', error);
+        res.status(500).json({ message: 'Gagal menambahkan user' });
+    }
+};
+
+export const removeUserFromCompany = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const { id, userId } = req.params;
+
+        if (userId === authReq.user.id) {
+            return res.status(400).json({ message: 'Anda tidak dapat menghapus diri sendiri.' });
+        }
+
+        const access = await prisma.aksesPengguna.findFirst({
+            where: {
+                perusahaanId: String(id),
+                penggunaId: userId
+            }
+        });
+
+        if (!access) {
+            return res.status(404).json({ message: 'User tidak ditemukan di perusahaan ini.' });
+        }
+
+        await prisma.aksesPengguna.delete({
+            where: { id: access.id }
+        });
+
+        res.json({ message: 'User berhasil dihapus aksesnya.' });
+    } catch (error) {
+        console.error('Remove User Error:', error);
+        res.status(500).json({ message: 'Gagal menghapus user' });
     }
 };

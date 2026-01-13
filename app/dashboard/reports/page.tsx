@@ -1,11 +1,14 @@
 'use client';
 
+'use client';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { ArrowRight, BarChart3, PieChart, Landmark, FileText, TrendingUp, Download } from 'lucide-react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { toast } from 'sonner';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 
 const reports = [
     {
@@ -51,11 +54,12 @@ const reports = [
 ];
 
 export default function ReportsDashboard() {
+    useRequireAuth('/login', ['SUPERADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER']);
 
     const handleDownload = async (type: string, format: 'pdf' | 'excel') => {
         try {
             const toastId = toast.loading(`Menyiapkan ${format.toUpperCase()}...`);
-            const response = await axios.post('/api/reports/export', {
+            const response = await api.post('/reports/export', {
                 type,
                 format,
             }, {
@@ -115,19 +119,12 @@ export default function ReportsDashboard() {
                             </CardContent>
 
                             <CardFooter className="pt-2 border-t flex gap-2 justify-end bg-slate-50/50">
-                                {['balance-sheet', 'income-statement'].includes(report.type) && (
-                                    <>
-                                        <Button variant="outline" size="sm" onClick={() => handleDownload(report.type, 'pdf')}>
-                                            <Download className="h-3 w-3 mr-1" /> PDF
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={() => handleDownload(report.type, 'excel')}>
-                                            <Download className="h-3 w-3 mr-1" /> Excel
-                                        </Button>
-                                    </>
-                                )}
-                                {!['balance-sheet', 'income-statement'].includes(report.type) && (
-                                    <span className="text-xs text-muted-foreground italic">Export segera hadir</span>
-                                )}
+                                <Button variant="outline" size="sm" onClick={() => handleDownload(report.type, 'pdf')}>
+                                    <Download className="h-3 w-3 mr-1" /> PDF
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => handleDownload(report.type, 'excel')}>
+                                    <Download className="h-3 w-3 mr-1" /> Excel
+                                </Button>
                             </CardFooter>
                         </Card>
                     );

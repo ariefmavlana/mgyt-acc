@@ -2,7 +2,7 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'Audit Trail (Log Aktivitas) | Mavlana ERP',
+    title: 'Audit Trail (Log Aktivitas) | Mgyt ERP',
     description: 'Pantau semua aktivitas pengguna dan perubahan sistem secara real-time.',
 };
 

@@ -62,13 +62,30 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             }
         });
 
-        // 5. Active Users
-        const activeUsers = await prisma.aksesPengguna.count({
+        // 5. Active Users & Breakdown
+        const activeUsersCount = await prisma.aksesPengguna.count({
             where: {
                 perusahaanId,
                 isAktif: true
             }
         });
+
+        const usersByRole = await prisma.aksesPengguna.groupBy({
+            by: ['roleEnum'],
+            where: {
+                perusahaanId,
+                isAktif: true
+            },
+            _count: {
+                _all: true
+            }
+        });
+
+        // Format: { ADMIN: 2, STAFF: 5 }
+        const roleBreakdown = usersByRole.reduce((acc, curr) => {
+            acc[curr.roleEnum] = curr._count._all;
+            return acc;
+        }, {} as Record<string, number>);
 
         // 6. Cash Balance
         const cashAgg = await prisma.jurnalDetail.aggregate({
@@ -93,7 +110,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             expense,
             netProfit,
             pendingApprovals,
-            activeUsers,
+            activeUsers: activeUsersCount,
+            usersByRole: roleBreakdown,
             cashBalance
         });
 

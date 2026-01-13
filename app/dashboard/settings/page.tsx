@@ -13,9 +13,10 @@ import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 import { PeriodSettings } from '@/components/settings/period-settings';
 import { WarehouseSettings } from '@/components/inventory/warehouse-settings';
+import { UsersTable } from '@/components/settings/users-table';
 
 export default function SettingsPage() {
-    const { user } = useRequireAuth();
+    const { user } = useRequireAuth('/login', ['SUPERADMIN', 'ADMIN']);
     const companyId = user?.perusahaan?.id;
     const { currentCompany: company, loading: isLoading, updateCompany: updateCompanyFn } = useCompany();
     const [isSaving, setIsSaving] = useState(false);
@@ -88,7 +89,7 @@ export default function SettingsPage() {
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">Pengaturan</h1>
-                <p className="text-slate-500 mt-1">Kelola preferensi dan konfigurasi sistem Mavlana Accounting.</p>
+                <p className="text-slate-500 mt-1">Kelola preferensi dan konfigurasi sistem Mgyt Accounting.</p>
             </div>
 
             {/* Tabs Interface */}
@@ -118,7 +119,7 @@ export default function SettingsPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="nama">Nama Perusahaan</Label>
-                                    <Input id="nama" value={form.nama} onChange={handleChange} placeholder="Contoh: PT Mavlana Teknologi" />
+                                    <Input id="nama" value={form.nama} onChange={handleChange} placeholder="Contoh: PT Medina Giacarta" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="npwp">NPWP</Label>
@@ -171,10 +172,13 @@ export default function SettingsPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-center py-10 text-slate-500">
-                                <p>Daftar pengguna akan ditampilkan di sini.</p>
-                                <Button variant="outline" className="mt-4">Tambah Pengguna</Button>
-                            </div>
+                            {companyId ? (
+                                <UsersTable companyId={companyId} />
+                            ) : (
+                                <div className="text-center py-4 text-red-500">
+                                    Data perusahaan tidak ditemukan.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

@@ -199,6 +199,133 @@ const fetchIncomeStatement = async (perusahaanId: string, startDate?: string, en
         },
         period: { start, end }
     };
+    return {
+        revenue: revenues,
+        expense: expenses,
+        summary: {
+            totalRevenue,
+            totalExpense,
+            netIncome: totalRevenue - totalExpense
+        },
+        period: { start, end }
+    };
+};
+
+const fetchCashFlow = async (perusahaanId: string, startDate?: string, endDate?: string) => {
+    const start = startDate ? new Date(String(startDate)) : startOfYear(new Date());
+    const end = endDate ? endOfDay(new Date(String(endDate))) : endOfDay(new Date());
+
+    const cashAccounts = await prisma.chartOfAccounts.findMany({
+        where: {
+            perusahaanId,
+            kategoriAset: 'KAS_DAN_SETARA_KAS'
+        },
+        select: { id: true }
+    });
+
+    const cashAccountIds = cashAccounts.map(c => c.id);
+
+    const cashMovements = await prisma.jurnalDetail.findMany({
+        where: {
+            akunId: { in: cashAccountIds },
+            jurnal: {
+                perusahaanId,
+                tanggal: { gte: start, lte: end }
+            }
+        },
+        include: {
+            jurnal: {
+                include: {
+                    detail: {
+                        include: { akun: true }
+                    }
+                }
+            }
+        }
+    });
+
+    let operatingCashFlow = 0;
+    let investingCashFlow = 0;
+    let financingCashFlow = 0;
+
+    for (const move of cashMovements) {
+        const isDebit = Number(move.debit) > 0;
+        const amount = isDebit ? Number(move.debit) : -Number(move.kredit);
+
+        const contraEntry = move.jurnal.detail.find((d) => !cashAccountIds.includes(d.akunId));
+
+        if (contraEntry) {
+            const type = contraEntry.akun.tipe;
+            if (['ASET_TETAP', 'INVESTASI_JANGKA_PANJANG', 'PROPERTI_INVESTASI'].includes(type)) {
+                investingCashFlow += amount;
+            } else if (['LIABILITAS_JANGKA_PANJANG', 'EKUITAS'].includes(type)) {
+                financingCashFlow += amount;
+            } else {
+                operatingCashFlow += amount;
+            }
+        } else {
+            operatingCashFlow += amount;
+        }
+    }
+
+    return {
+        operating: operatingCashFlow,
+        investing: investingCashFlow,
+        financing: financingCashFlow,
+        netChange: operatingCashFlow + investingCashFlow + financingCashFlow,
+        period: { start, end }
+    };
+};
+
+const fetchTrialBalance = async (perusahaanId: string, date?: string) => {
+    const asOfDate = date ? endOfDay(new Date(String(date))) : endOfDay(new Date());
+
+    const accounts = await prisma.chartOfAccounts.findMany({
+        where: { perusahaanId },
+        include: {
+            jurnalDetail: {
+                where: {
+                    jurnal: { tanggal: { lte: asOfDate } }
+                },
+                select: { debit: true, kredit: true }
+            }
+        },
+        orderBy: { kodeAkun: 'asc' }
+    });
+
+    const report = accounts.map(acc => {
+        const totalDebit = acc.jurnalDetail.reduce((sum, jd) => sum + Number(jd.debit), 0);
+        const totalCredit = acc.jurnalDetail.reduce((sum, jd) => sum + Number(jd.kredit), 0);
+
+        let finalDebit = 0;
+        let finalCredit = 0;
+
+        if (totalDebit >= totalCredit) {
+            finalDebit = totalDebit - totalCredit;
+        } else {
+            finalCredit = totalCredit - totalDebit;
+        }
+
+        return {
+            id: acc.id,
+            kode: acc.kodeAkun,
+            nama: acc.namaAkun,
+            debit: finalDebit,
+            kredit: finalCredit
+        };
+    }).filter(item => item.debit > 0 || item.kredit > 0);
+
+    const totalDebit = report.reduce((sum, r) => sum + r.debit, 0);
+    const totalCredit = report.reduce((sum, r) => sum + r.kredit, 0);
+
+    return {
+        data: report,
+        summary: {
+            totalDebit,
+            totalCredit,
+            isBalanced: Math.abs(totalDebit - totalCredit) < 1
+        }
+    };
 };
 
 // --- CONTROLLERS ---
@@ -547,6 +674,46 @@ export const exportReport = async (req: Request, res: Response) => {
                 doc.moveDown();
 
                 doc.fontSize(16).text(`LABA BERSIH: ${new Intl.NumberFormat('id-ID').format(data.summary.netIncome)}`, { align: 'right' });
+            } else if (type === 'cash-flow') {
+                const data = await fetchCashFlow(perusahaanId, startDate, endDate);
+
+                doc.fontSize(14).text('ARUS KAS OPERASIONAL', { underline: true });
+                doc.fontSize(12).text(`Total: ${new Intl.NumberFormat('id-ID').format(data.operating)}`, { align: 'right' });
+                doc.moveDown();
+
+                doc.fontSize(14).text('ARUS KAS INVESTASI', { underline: true });
+                doc.fontSize(12).text(`Total: ${new Intl.NumberFormat('id-ID').format(data.investing)}`, { align: 'right' });
+                doc.moveDown();
+
+                doc.fontSize(14).text('ARUS KAS PENDANAAN', { underline: true });
+                doc.fontSize(12).text(`Total: ${new Intl.NumberFormat('id-ID').format(data.financing)}`, { align: 'right' });
+                doc.moveDown();
+
+                doc.fontSize(16).text(`KENAIKAN BERSIH KAS: ${new Intl.NumberFormat('id-ID').format(data.netChange)}`, { align: 'right' });
+            } else if (type === 'trial-balance') {
+                const data = await fetchTrialBalance(perusahaanId, endDate);
+
+                doc.fontSize(10);
+                doc.text('Kode', 50, doc.y, { continued: true, width: 80 });
+                doc.text('Nama Akun', { continued: true, width: 200 });
+                doc.text('Debit', { continued: true, width: 100, align: 'right' });
+                doc.text('Kredit', { width: 100, align: 'right' });
+                doc.moveDown();
+
+                data.data.forEach((row: any) => {
+                    doc.text(row.kode, 50, doc.y, { continued: true, width: 80 });
+                    doc.text(row.nama, { continued: true, width: 200 });
+                    doc.text(new Intl.NumberFormat('id-ID').format(row.debit), { continued: true, width: 100, align: 'right' });
+                    doc.text(new Intl.NumberFormat('id-ID').format(row.kredit), { width: 100, align: 'right' });
+                });
+
+                doc.moveDown();
+                doc.font('Helvetica-Bold');
+                doc.text('TOTAL', 50, doc.y, { continued: true, width: 280 });
+                doc.text(new Intl.NumberFormat('id-ID').format(data.summary.totalDebit), { continued: true, width: 100, align: 'right' });
+                doc.text(new Intl.NumberFormat('id-ID').format(data.summary.totalCredit), { width: 100, align: 'right' });
+            } else if (type === 'general-ledger') {
+                doc.text('Silakan export Buku Besar dari halaman detail akun untuk data yang lebih spesifik.', { align: 'center' });
             }
 
             doc.end();
@@ -593,6 +760,23 @@ export const exportReport = async (req: Request, res: Response) => {
 
                 sheet.addRow(['']);
                 sheet.addRow(['LABA BERSIH', data.summary.netIncome]).font = { size: 14, bold: true };
+            } else if (type === 'cash-flow') {
+                const data = await fetchCashFlow(perusahaanId, startDate, endDate);
+                sheet.addRow(['ARUS KAS', `${startDate} - ${endDate}`]);
+                sheet.addRow(['Operasional', data.operating]);
+                sheet.addRow(['Investasi', data.investing]);
+                sheet.addRow(['Pendanaan', data.financing]);
+                sheet.addRow(['Kenaikan Bersih', data.netChange]).font = { bold: true };
+            } else if (type === 'trial-balance') {
+                const data = await fetchTrialBalance(perusahaanId, endDate);
+                sheet.addRow(['NERACA SALDO', endDate]);
+                sheet.addRow(['Kode', 'Nama Akun', 'Debit', 'Kredit']).font = { bold: true };
+                data.data.forEach((row: any) => {
+                    sheet.addRow([row.kode, row.name, row.debit, row.kredit]);
+                });
+                sheet.addRow(['TOTAL', '', data.summary.totalDebit, data.summary.totalCredit]).font = { bold: true };
+            } else if (type === 'general-ledger') {
+                sheet.addRow(['Info', 'Silakan export dari halaman detail akun.']);
             }
 
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -610,6 +794,8 @@ export const exportReport = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Export failed' });
     }
 };
+
+
 
 export const getARAging = async (req: Request, res: Response) => {
     try {

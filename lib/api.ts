@@ -8,13 +8,52 @@ const api = axios.create({
     },
 });
 
-// Interceptor to inject CSRF token from cookies
-api.interceptors.request.use((config) => {
-    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
-        // In a real browser env with withCredentials: true, 
-        // we can try to get the token from a meta tag or a specific endpoint if not already in headers
-        // For now, we rely on the backend setting it in a cookie that the browser sends, 
-        // but the double-csrf library usually expects it in a header too.
+
+let csrfPromise: Promise<string> | null = null;
+
+const getCsrfToken = async () => {
+    if (csrfPromise) return csrfPromise;
+    csrfPromise = (async () => {
+        try {
+            const { data } = await axios.get(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/csrf-token`,
+                { withCredentials: true }
+            );
+            return data.csrfToken;
+        } catch (e) {
+            console.error('Failed to fetch CSRF token', e);
+            throw e;
+        } finally {
+            csrfPromise = null;
+        }
+    })();
+    return csrfPromise;
+};
+
+// Interceptor to inject CSRF token
+api.interceptors.request.use(async (config) => {
+    const method = config.method?.toLowerCase() || 'get';
+
+    // Check if method is unsafe
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        // If we don't have a token in headers, fetch it
+        if (!api.defaults.headers.common['x-csrf-token']) {
+            try {
+                const token = await getCsrfToken();
+                api.defaults.headers.common['x-csrf-token'] = token;
+                if (config.headers) {
+                    config.headers['x-csrf-token'] = token;
+                }
+            } catch (_error) {
+                // Proceed without token? Likely to fail, but let the error handler catch 403
+                console.warn("Proceeding request without CSRF token due to fetch failure");
+            }
+        } else {
+            // Ensure it is attached to this specific request config if strictly needed
+            if (config.headers && !config.headers['x-csrf-token']) {
+                config.headers['x-csrf-token'] = api.defaults.headers.common['x-csrf-token'];
+            }
+        }
     }
     return config;
 });
@@ -29,12 +68,10 @@ api.interceptors.response.use(
         if (error.response?.status === 403 && error.response?.data?.message === 'Invalid CSRF token' && !originalRequest._csrfRetry) {
             originalRequest._csrfRetry = true;
             try {
-                const { data } = await axios.get(
-                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/csrf-token`,
-                    { withCredentials: true }
-                );
-                api.defaults.headers.common['x-csrf-token'] = data.csrfToken;
-                originalRequest.headers['x-csrf-token'] = data.csrfToken;
+                // Force fresh fetch
+                const token = await getCsrfToken();
+                api.defaults.headers.common['x-csrf-token'] = token;
+                originalRequest.headers['x-csrf-token'] = token;
                 return api(originalRequest);
             } catch (csrfError) {
                 return Promise.reject(csrfError);

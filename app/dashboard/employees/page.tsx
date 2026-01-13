@@ -11,11 +11,15 @@ import { Badge } from '@/components/ui/badge';
 import { useHR } from '@/hooks/use-hr';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
+import { EmployeeForm } from '@/components/hr/employee-form';
+import { Employee } from '@/hooks/use-hr';
 
 export default function EmployeesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const { useEmployees } = useHR();
     const { data: employees, isLoading } = useEmployees({ search: searchTerm });
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
     // Function to get initials for avatar
     const getInitials = (name: string) => {
@@ -25,6 +29,16 @@ export default function EmployeesPage() {
             .join('')
             .toUpperCase()
             .slice(0, 2);
+    };
+
+    const handleEdit = (emp: Employee) => {
+        setSelectedEmployee(emp);
+        setIsFormOpen(true);
+    };
+
+    const handleCreate = () => {
+        setSelectedEmployee(null);
+        setIsFormOpen(true);
     };
 
     return (
@@ -39,7 +53,7 @@ export default function EmployeesPage() {
                     <Button variant="outline" className="border-slate-200">
                         <Download className="mr-2 h-4 w-4" /> Ekspor Data
                     </Button>
-                    <Button className="bg-primary hover:bg-primary/90">
+                    <Button className="bg-primary hover:bg-primary/90" onClick={handleCreate}>
                         <UserPlus className="mr-2 h-4 w-4" /> Tambah Karyawan
                     </Button>
                 </div>
@@ -116,7 +130,7 @@ export default function EmployeesPage() {
                                                 : '-'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="ghost" size="sm">Detail</Button>
+                                            <Button variant="ghost" size="sm" onClick={() => handleEdit(emp)}>Detail</Button>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -131,6 +145,12 @@ export default function EmployeesPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            <EmployeeForm
+                open={isFormOpen}
+                onOpenChange={setIsFormOpen}
+                employee={selectedEmployee}
+            />
         </div>
     );
 }

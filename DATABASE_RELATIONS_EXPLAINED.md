@@ -874,6 +874,164 @@ Overall: 98% utilization (GOOD!)
 
 ---
 
+---
+
+## 👥 MODUL 8: HR & PAYROLL (Employee Management)
+
+### Diagram HR Flow
+
+```
+KARYAWAN → KONTRAK → PENGGAJIAN
+
+┌────────────┐
+│  Karyawan  │ ◄──── Master Data Pegawai
+│ (Employee) │        (Nama, NIK, NPWP, Status)
+└─────┬──────┘
+      │
+      │ has many
+      ▼
+┌──────────────┐
+│  Penggajian  │ ◄──── Payroll Bulanan
+│  (Payroll)   │        Periode: Jan 2024
+│              │        Basic + Tunjangan - Potongan
+└──────────────┘
+```
+
+**Contoh Real (Gaji Bulanan):**
+
+```typescript
+// 1. Create Employee
+const karyawan = await prisma.karyawan.create({
+  data: {
+    nik: "EMP-001",
+    nama: "Budi Santoso",
+    gajiPokok: 10000000,
+    statusPernikahan: "K/1", // Kawin, 1 Anak
+    jabatan: "Senior Developer",
+    tanggalMasuk: new Date("2020-01-01")
+  }
+});
+
+// 2. Generate Payroll (End of Month)
+const payroll = await prisma.penggajian.create({
+  data: {
+    karyawanId: karyawan.id,
+    periode: "2024-01",
+    tanggalBayar: new Date("2024-01-25"),
+    
+    // Income
+    gajiPokok: 10000000,
+    tunjangan: 2000000,
+    lembur: 500000,
+    
+    // Deductions (Auto Calculated)
+    potonganPph21: 350000,
+    potonganBpjs: 200000,
+    
+    // Net
+    totalPenghasilan: 12500000,
+    totalPotongan: 550000,
+    netto: 11950000, // Take Home Pay
+    
+    status: "DRAFT"
+  }
+});
+
+// 3. Posting to General Ledger (Auto)
+// Debit: Beban Gaji
+// Kredit: Hutang Gaji / Kas
+```
+
+---
+
+## 📂 MODUL 9: DOCUMENT MANAGEMENT
+
+### Diagram Dokumen
+
+```
+FILE STORAGE LINKED TO EVERYTHING
+
+┌──────────────┐      ┌─────────────┐
+│ UploadedFile │ ────►│ Perusahaan  │
+│ (DokumenTx)  │      └─────────────┘
+└──────┬───────┘      ┌─────────────┐
+       ├─────────────►│  Transaksi  │
+       │              └─────────────┘
+       │              ┌─────────────┐
+       ├─────────────►│   Voucher   │
+       │              └─────────────┘
+       │              ┌─────────────┐
+       └─────────────►│  AsetTetap  │
+                      └─────────────┘
+```
+
+**Penjelasan:**
+Dokumen disimpan terpusat di table `DokumenTransaksi` dan bisa relasi (polymorphic-like) ke berbagai entitas.
+
+```typescript
+// Upload Bukti Potong Pajak untuk Transaksi
+const doc = await prisma.dokumenTransaksi.create({
+  data: {
+    perusahaanId: "company-123",
+    transaksiId: "tx-inv-001", // Link ke Invoice
+    
+    nama: "Bukti_Potong_Pph23.pdf",
+    urlFile: "https://storage.mavlana.com/...",
+    jenisFile: "pdf",
+    ukuranFile: 102400,
+    kategori: "PAJAK"
+  }
+});
+
+// Upload Foto Aset
+const assetPhoto = await prisma.dokumenTransaksi.create({
+  data: {
+    perusahaanId: "company-123",
+    asetTetapId: "asset-laptop-01", // Link ke Asset
+    
+    nama: "Kondisi_Laptop.jpg",
+    urlFile: "...",
+    kategori: "FOTO_ASET"
+  }
+});
+```
+
+---
+
+## 🛡️ MODUL 10: SYSTEM & AUDIT
+
+### Diagram Audit Trail
+
+```
+USER ACTION → LOGGED FOREVER
+
+┌──────────┐       ┌──────────────┐
+│ Pengguna │ ────► │  JejakAudit  │
+│  (Actor) │       │ (Audit Log)  │
+└──────────┘       └──────────────┘
+                          ▲
+                          │
+Records: Who, When, What, Where (IP), Diff
+```
+
+**Contoh Audit Log:**
+
+```json
+{
+  "aksi": "UPDATE",
+  "modul": "TRANSAKSI",
+  "idData": "inv-001",
+  "pengguna": "Budi (Finance)",
+  "dataSebelum": { "staus": "DRAFT", "total": 1000000 },
+  "dataSesudah": { "status": "APPROVED", "total": 1000000 },
+  "perubahan": { "status": ["DRAFT", "APPROVED"] }, // Diff
+  "ipAddress": "192.168.1.50",
+  "timestamp": "2024-01-13T10:00:00Z"
+}
+```
+
+---
+
 ## 🎯 RINGKASAN RELASI PENTING
 
 ### 1. **One-to-Many (Paling Umum)**

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { ArrowRightLeft, TrendingUp, AlertTriangle, Package } from 'lucide-react';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function InventoryPage() {
     const [isMovementOpen, setIsMovementOpen] = useState(false);
@@ -18,6 +19,14 @@ export default function InventoryPage() {
         queryKey: ['inventory-all'],
         queryFn: async () => {
             const res = await api.get('/inventory/stock');
+            return res.data;
+        }
+    });
+
+    const { data: warehouses } = useQuery({
+        queryKey: ['warehouses'],
+        queryFn: async () => {
+            const res = await api.get('/inventory/warehouses');
             return res.data;
         }
     });
@@ -31,12 +40,15 @@ export default function InventoryPage() {
     });
 
     // Derived stats
-    const totalValue = stocks?.reduce((acc: number, item: any) => acc + Number(item.nilaiStok), 0) || 0;
-    const totalItems = stocks?.reduce((acc: number, item: any) => acc + Number(item.kuantitas), 0) || 0;
+    const totalValue = stocks?.reduce((acc: number, item: any) => acc + Number(item.nilaiStok || 0), 0) || 0;
+    const totalItems = stocks?.reduce((acc: number, item: any) => acc + Number(item.kuantitas || 0), 0) || 0;
 
-    // Find low stock items (Assuming we can check vs min stock if available, but for now just raw list or visual check)
-    // The stock endpoint returns persediaan which likely has stokMinimum
-    const lowStockItems = stocks?.filter((s: any) => Number(s.kuantitas) <= Number(s.persediaan.stokMinimum || 5) && Number(s.persediaan.stokMinimum) > 0) || [];
+    // Find low stock items
+    const lowStockItems = stocks?.filter((s: any) => {
+        const qty = Number(s.kuantitas || 0);
+        const min = Number(s.persediaan?.stokMinimum || 0);
+        return min > 0 && qty <= min;
+    }) || [];
 
     const formatCurrency = (val: number) =>
         new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -85,19 +97,21 @@ export default function InventoryPage() {
                         <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-yellow-600">{lowStockItems.length}</div>
+                        <div className={`text-2xl font-bold ${lowStockItems.length > 0 ? 'text-red-600' : 'text-slate-900'}`}>{lowStockItems.length}</div>
                         <p className="text-xs text-muted-foreground">Item dibawah batas minimum</p>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Gudang Aktif</CardTitle>
-                        <Package className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">2</div>
-                        <p className="text-xs text-muted-foreground">Lokasi penyimpanan</p>
-                    </CardContent>
+                    <Link href="/dashboard/inventory/warehouses">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 cursor-pointer hover:bg-slate-50 transition-colors rounded-t-lg">
+                            <CardTitle className="text-sm font-medium">Gudang Aktif</CardTitle>
+                            <Package className="h-4 w-4 text-blue-500" />
+                        </CardHeader>
+                        <CardContent className="cursor-pointer hover:bg-slate-50 transition-colors rounded-b-lg">
+                            <div className="text-2xl font-bold">{warehouses ? warehouses.length : '-'}</div>
+                            <p className="text-xs text-muted-foreground hover:underline">Kelola Lokasi & Stok &rarr;</p>
+                        </CardContent>
+                    </Link>
                 </Card>
             </div>
 

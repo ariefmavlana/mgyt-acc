@@ -14,6 +14,7 @@ export const registerSchema = z.object({
     confirmPassword: z.string(),
     role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
     namaPerusahaan: z.string().min(2, 'Nama perusahaan harus minimal 2 karakter').optional(),
+    paket: z.enum(['UMKM', 'SMALL', 'MEDIUM', 'ENTERPRISE']).optional().default('UMKM'),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Konfirmasi password tidak cocok",
     path: ["confirmPassword"],
@@ -41,3 +42,11 @@ export const changePasswordSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const updateProfileSchema = z.object({
+    namaLengkap: z.string().min(3, 'Nama harus minimal 3 karakter').optional(),
+    telepon: z.string().optional(),
+    foto: z.string().url('URL foto tidak valid').optional().or(z.literal('')),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

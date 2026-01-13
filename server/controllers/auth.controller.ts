@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { registerSchema, loginSchema, changePasswordSchema } from '../validators/auth.validator';
+import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '../validators/auth.validator';
 import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
 import { RoleEnum } from '@prisma/client';
@@ -50,6 +50,40 @@ export const register = async (req: Request, res: Response) => {
                     }
                 });
                 perusahaanId = perusahaan.id;
+
+                // Handle Package (Paket Usaha)
+                const paketTier = validatedData.paket || 'UMKM';
+
+                // Try to find existing package or create default if missing (Auto-seeding logic)
+                let paketFitur = await tx.paketFitur.findFirst({
+                    where: { tier: paketTier as any }
+                });
+
+                if (!paketFitur) {
+                    paketFitur = await tx.paketFitur.create({
+                        data: {
+                            kode: `PKG-${paketTier}`,
+                            nama: `Paket ${paketTier}`,
+                            tier: paketTier as any,
+                            isAktif: true,
+                            isPublik: true
+                        }
+                    });
+                }
+
+                // Create PerusahaanPaket
+                await tx.perusahaanPaket.create({
+                    data: {
+                        perusahaanId: perusahaan.id,
+                        paketId: paketFitur.id,
+                        tanggalMulai: new Date(),
+                        // Default trial 14 days or active immediately
+                        tanggalAkhir: new Date(new Date().setDate(new Date().getDate() + 30)),
+                        isAktif: true,
+                        isTrial: true
+                    }
+                });
+
             } else {
                 // Find existing or create a default "Personal" company
                 const defaultCo = await tx.perusahaan.findFirst({ where: { kode: 'DEF-ACC' } });
@@ -431,5 +465,64 @@ export const changePassword = async (req: Request, res: Response) => {
             return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat mengubah password' });
+    }
+};
+
+export const updateProfile = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const user = authReq.user;
+        const validatedData = updateProfileSchema.parse(req.body);
+
+        const updatedUser = await prisma.pengguna.update({
+            where: { id: user.id },
+            data: {
+                ...validatedData
+            },
+            include: {
+                aksesPerusahaan: {
+                    where: { isAktif: true },
+                    include: { perusahaan: true }
+                }
+            }
+        });
+
+        // Audit Log
+        await prisma.jejakAudit.create({
+            data: {
+                perusahaanId: authReq.currentCompanyId || 'system',
+                penggunaId: user.id,
+                aksi: 'UPDATE_PROFILE',
+                modul: 'AUTH',
+                namaTabel: 'Pengguna',
+                idData: user.id,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+                keterangan: 'Update profil pengguna'
+            }
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { password: _, ...userWithoutPassword } = updatedUser;
+
+        res.json({
+            message: 'Profil berhasil diperbarui',
+            user: {
+                ...userWithoutPassword,
+                companies: updatedUser.aksesPerusahaan.map(a => ({
+                    id: a.perusahaanId,
+                    nama: a.perusahaan.nama,
+                    role: a.roleEnum,
+                    isDefault: a.isDefault
+                }))
+            }
+        });
+
+    } catch (error: unknown) {
+        if (error instanceof ZodError) {
+            const message = error.errors?.[0]?.message || 'Kesalahan validasi data';
+            return res.status(400).json({ message });
+        }
+        res.status(500).json({ message: 'Error server saat update profil' });
     }
 };

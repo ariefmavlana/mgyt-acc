@@ -11,35 +11,60 @@ export const getStock = async (req: Request, res: Response) => {
         const { warehouseId, productId } = req.query;
         const perusahaanId = authReq.currentCompanyId!;
 
-        const where: Prisma.StokPersediaanWhereInput = {
-            persediaan: { perusahaanId }
+        // 1. Fetch ALL Persediaan (Inventory Items) for the company
+        const wherePersediaan: Prisma.PersediaanWhereInput = {
+            perusahaanId,
+            status: 'TERSEDIA'
         };
 
-        if (warehouseId) where.gudangId = String(warehouseId);
         if (productId) {
             const product = await prisma.produk.findUnique({
                 where: { id: String(productId) },
                 select: { persediaanId: true }
             });
-            if (product?.persediaanId) where.persediaanId = product.persediaanId;
+            if (product?.persediaanId) wherePersediaan.id = product.persediaanId;
         }
 
-        const stocks = await prisma.stokPersediaan.findMany({
-            where,
+        const items = await prisma.persediaan.findMany({
+            where: wherePersediaan,
             include: {
-                persediaan: {
-                    select: {
-                        namaPersediaan: true,
-                        kodePersediaan: true,
-                        satuan: true,
-                        produk: { select: { id: true } } // Get Product ID
-                    }
-                },
-                gudang: { select: { nama: true, kode: true } }
-            }
+                produk: { select: { id: true, namaProduk: true } },
+                stok: {
+                    where: warehouseId ? { gudangId: String(warehouseId) } : undefined,
+                    include: { gudang: { select: { nama: true, kode: true } } }
+                }
+            },
+            orderBy: { namaPersediaan: 'asc' }
         });
 
-        res.json(stocks);
+        // 2. Map to ProductStock format expected by frontend
+        // If stock record missing for this warehouse, create a virtual one with 0 qty
+        const formattedStocks = items.map(item => {
+            const stockRecord = item.stok[0]; // Since we filter by specific warehouseId in include, this should be the one (or undefined)
+
+            // If we are searching for a specific warehouse, we return 1 entry per product
+            // If warehouseId is NOT provided, this logic would return only the first stock found (which might not be what we want for "Global" view, but for now this fixes the Opname Page which ALWAYS sends warehouseId)
+
+            return {
+                id: stockRecord?.id || `virtual-${item.id}`,
+                persediaanId: item.id,
+                gudangId: stockRecord?.gudangId || String(warehouseId || ''),
+                kuantitas: stockRecord?.kuantitas || 0,
+                nilaiStok: stockRecord?.nilaiStok || 0,
+                persediaan: {
+                    id: item.id,
+                    kodePersediaan: item.kodePersediaan,
+                    namaPersediaan: item.namaPersediaan,
+                    satuan: item.satuan,
+                    stokMinimum: item.stokMinimum || 0,
+                    hargaBeli: item.hargaBeli || 0,
+                    produk: item.produk
+                },
+                gudang: stockRecord?.gudang || { nama: 'Virtual', kode: 'VIRTUAL' }
+            };
+        });
+
+        res.json(formattedStocks);
     } catch (error) {
         console.error('Get Stock Error:', error);
         res.status(500).json({ message: 'Gagal mengambil data stok' });
@@ -159,7 +184,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                     }
 
                     // TRANSFER OUT
-                    await InventoryService.removeStock(tx as Prisma.TransactionClient, {
+                    const totalCostTransfer = await InventoryService.removeStock(tx as unknown as Prisma.TransactionClient, {
                         persediaanId,
                         gudangId: validatedData.gudangId,
                         qty: absQty,
@@ -169,12 +194,14 @@ export const recordMovement = async (req: Request, res: Response) => {
                         keterangan: validatedData.keterangan || `Transfer ke Gudang ID: ${targetGudangId}`
                     });
 
+                    const realUnitCost = totalCostTransfer / absQty;
+
                     // TRANSFER IN
-                    await InventoryService.addStock(tx as Prisma.TransactionClient, {
+                    await InventoryService.addStock(tx as unknown as Prisma.TransactionClient, {
                         persediaanId,
                         gudangId: targetGudangId,
                         qty: absQty,
-                        costPerUnit: costPrice,
+                        costPerUnit: realUnitCost,
                         refType: 'TRANSFER_IN',
                         refId: `MUT-${timestamp}-IN`,
                         tanggal: new Date(validatedData.tanggal),
@@ -195,7 +222,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                             throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk}. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
                         }
 
-                        await InventoryService.removeStock(tx as Prisma.TransactionClient, {
+                        await InventoryService.removeStock(tx as unknown as Prisma.TransactionClient, {
                             persediaanId,
                             gudangId: validatedData.gudangId,
                             qty: absQty,
@@ -205,7 +232,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                             keterangan: validatedData.keterangan || 'Pengurangan Stok'
                         });
                     } else {
-                        await InventoryService.addStock(tx as Prisma.TransactionClient, {
+                        await InventoryService.addStock(tx as unknown as Prisma.TransactionClient, {
                             persediaanId,
                             gudangId: validatedData.gudangId,
                             qty: absQty,

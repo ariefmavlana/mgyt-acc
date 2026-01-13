@@ -99,7 +99,7 @@ export function CompanyTable({ data, onDelete }: CompanyTableProps) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Aksi</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => router.push(`/companies/${company.id}`)}>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/companies/${company.id}`)}>
                                 <Settings className="mr-2 h-4 w-4" />
                                 <span className="ml-2">Pengaturan</span>
                             </DropdownMenuItem>

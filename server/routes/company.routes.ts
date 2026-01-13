@@ -7,7 +7,10 @@ import {
     deleteCompany,
     updateSettings,
     getWarehouses,
-    getBranches
+    getBranches,
+    getCompanyUsers,
+    addUserToCompany,
+    removeUserFromCompany
 } from '../controllers/company.controller';
 import { protect } from '../middleware/auth.middleware';
 
@@ -23,5 +26,10 @@ router.post('/', createCompany);
 router.put('/:id', updateCompany);
 router.delete('/:id', deleteCompany);
 router.post('/:id/settings', updateSettings);
+
+// User Management
+router.get('/:id/users', getCompanyUsers);
+router.post('/:id/users', addUserToCompany);
+router.delete('/:id/users/:userId', removeUserFromCompany);
 
 export default router;

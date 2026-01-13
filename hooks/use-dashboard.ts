@@ -8,6 +8,7 @@ export interface DashboardStats {
     netProfit: number;
     pendingApprovals: number;
     activeUsers: number;
+    usersByRole: Record<string, number>;
     cashBalance: number;
 }
 

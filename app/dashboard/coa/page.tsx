@@ -23,6 +23,7 @@ import {
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 
 interface COANode {
     id: string;
@@ -36,12 +37,14 @@ interface COANode {
 }
 
 export default function COAPage() {
+    useRequireAuth('/login', ['SUPERADMIN', 'ADMIN', 'MANAGER']);
     const [data, setData] = useState<COANode[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState<any>(null);
     const [subParent, setSubParent] = useState<any>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const fetchCOA = useCallback(async () => {
         setLoading(true);
@@ -108,6 +111,62 @@ export default function COAPage() {
     };
 
     // Filter tree logic
+    const handleExport = async () => {
+        try {
+            const toastId = toast.loading('Mengekspor data akun...');
+            const response = await api.get('/coa/export', {
+                responseType: 'blob'
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `COA-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            toast.dismiss(toastId);
+            toast.success('Export berhasil');
+        } catch (error) {
+            toast.dismiss();
+            toast.error('Gagal mengexport data');
+        }
+    };
+
+    const handleImportClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const toastId = toast.loading('Mengimport data akun...');
+            const res = await api.post('/coa/import', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            toast.dismiss(toastId);
+            toast.success(res.data.message || 'Import berhasil');
+            // Refresh logic - better to reload full query
+            window.location.reload();
+        } catch (error: any) {
+            toast.dismiss();
+            toast.error(error.response?.data?.message || 'Gagal mengimport data');
+        } finally {
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
     const filteredData = useMemo(() => {
         if (!search) return data;
 
@@ -150,10 +209,17 @@ export default function COAPage() {
                     <p className="text-slate-500">Kelola hierarki akun dan saldo buku besar Anda.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={handleImportClick}>
                         <Upload className="h-4 w-4" /> Import
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".xlsx, .xls"
+                        onChange={handleFileChange}
+                    />
+                    <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
                         <Download className="h-4 w-4" /> Export
                     </Button>
                     <Button onClick={handleCreate} className="btn-primary gap-2">

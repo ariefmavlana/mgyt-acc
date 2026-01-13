@@ -14,6 +14,7 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
@@ -26,6 +27,8 @@ const registerSchema = z.object({
     namaPerusahaan: z.string().min(2, 'Nama perusahaan harus minimal 2 karakter'),
     password: z.string().min(8, 'Password harus minimal 8 karakter'),
     confirmPassword: z.string(),
+    role: z.enum(['ADMIN', 'MANAGER', 'STAFF', 'VIEWER']),
+    paket: z.enum(['UMKM', 'SMALL', 'MEDIUM', 'ENTERPRISE']),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Konfirmasi password tidak cocok",
     path: ["confirmPassword"],
@@ -44,6 +47,8 @@ export const RegisterForm = () => {
             namaPerusahaan: '',
             password: '',
             confirmPassword: '',
+            role: 'ADMIN', // Default to ADMIN for first user usually, or changes per business logic
+            paket: 'UMKM',
         },
     });
 
@@ -117,6 +122,52 @@ export const RegisterForm = () => {
                                     <FormControl>
                                         <Input placeholder="PT Maju Bersama" {...field} disabled={isPending} />
                                     </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="paket"
+                            render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel>Paket Usaha</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Pilih paket usaha" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="UMKM">UMKM (Micro)</SelectItem>
+                                            <SelectItem value="SMALL">Starter (Small Business)</SelectItem>
+                                            <SelectItem value="MEDIUM">Growth (Medium Business)</SelectItem>
+                                            <SelectItem value="ENTERPRISE">Enterprise (Corporate)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="role"
+                            render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel>Peran Pengguna (Role)</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Pilih peran pengguna" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="ADMIN">Administrator (Pemilik/Direktur)</SelectItem>
+                                            <SelectItem value="MANAGER">Manager (Keuangan, Operasional)</SelectItem>
+                                            <SelectItem value="STAFF">Staff (Input Data, Kasir)</SelectItem>
+                                            <SelectItem value="VIEWER">Viewer (Hanya Melihat Laporan)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}

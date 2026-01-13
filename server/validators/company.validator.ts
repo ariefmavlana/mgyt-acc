@@ -27,3 +27,8 @@ export const settingsSchema = z.object({
     alamat: z.string().optional(),
     telepon: z.string().optional(),
 });
+
+export const inviteUserSchema = z.object({
+    email: z.string().email('Format email tidak valid'),
+    role: z.enum(['SUPERADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER']).default('STAFF')
+});

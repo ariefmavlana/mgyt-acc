@@ -57,7 +57,7 @@ export function CompanyForm({ initialData, onSubmit }: CompanyFormProps) {
                             <FormItem>
                                 <FormLabel>Nama Perusahaan</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Contoh: PT. Mavlana Sejahtera" {...field} />
+                                    <Input placeholder="Contoh: PT. Medina Giacarta" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import api from '@/lib/api';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Save, RefreshCcw } from 'lucide-react';
@@ -43,36 +43,16 @@ export default function StockOpnamePage() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        // Fetch warehouses (Mocking endpoint or using existing)
-        axios.get('/api/companies/cabang') // Assuming branches/warehouses endpoint
-            .then(res => {
-                // Filter where isGudang/hasGudang if needed
-                // For now assuming all branches have warehouses or mapping them
-                // Lets try to find dedicated warehouse endpoint
-                // If not, we iterate branches
-                setWarehouses(res.data.flatMap((c: any) => c.gudang || []));
-            })
-            .catch(() => {
-                // Fallback: Fetch from stocks to find unique warehouses (Not ideal but works for read)
-            });
-
-        // For accurate warehouse list, we should add a route.
-        // Lets assume we have some valid warehouse IDs from context or hardcoded for now if needed.
-        // Actually, let's fetch inventory/stock without filters to see available warehouses? No too much data.
-
-        const fetchW = async () => {
-            // Quick way: Use Company structure
+        const fetchWarehouses = async () => {
             try {
-                const res = await axios.get('/api/companies'); // Current company details usually has branches->gudang
-                const company = res.data;
-                const gudangs: Warehouse[] = [];
-                company.cabang?.forEach((c: any) => {
-                    if (c.gudang) gudangs.push(...c.gudang);
-                });
-                setWarehouses(gudangs);
-            } catch (e) { }
-        }
-        fetchW();
+                const res = await api.get('/inventory/warehouses');
+                setWarehouses(res.data);
+            } catch (error) {
+                console.error('Failed to fetch warehouses', error);
+                toast.error('Gagal memuat data gudang');
+            }
+        };
+        fetchWarehouses();
     }, []);
 
     useEffect(() => {
@@ -87,7 +67,7 @@ export default function StockOpnamePage() {
     const fetchStock = async (warehouseId: string) => {
         setLoading(true);
         try {
-            const res = await axios.get(`/api/inventory/stock?warehouseId=${warehouseId}`);
+            const res = await api.get(`/inventory/stock?warehouseId=${warehouseId}`);
             setStocks(res.data);
             const initialOpname: Record<string, number> = {};
             res.data.forEach((s: ProductStock) => {
@@ -135,7 +115,7 @@ export default function StockOpnamePage() {
             }
 
             // Send to Backend
-            await axios.post('/api/inventory/movement', {
+            await api.post('/inventory/movement', {
                 items: itemsToAdjust,
                 gudangId: selectedWarehouse,
                 tipe: 'ADJUSTMENT',
