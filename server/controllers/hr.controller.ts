@@ -35,7 +35,7 @@ export const getEmployees = async (req: Request, res: Response) => {
             success: true,
             data: employees
         });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error fetching employees:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
@@ -189,66 +189,66 @@ export const generatePayroll = async (req: Request, res: Response) => {
             }
         });
 
-        const payrolls = [];
+        // 1. Pre-fetch existing payrolls for this period to avoid N+1 in lookup
+        const existingPayrolls = await prisma.penggajian.findMany({
+            where: {
+                periode: period,
+                karyawan: { perusahaanId }
+            },
+            select: { karyawanId: true }
+        });
+
+        const existingSet = new Set(existingPayrolls.map(p => p.karyawanId));
+        const payrollsToCreate = [];
 
         for (const emp of employees) {
-            // Check if already exists
-            const existing = await prisma.penggajian.findUnique({
-                where: {
-                    karyawanId_periode: {
-                        karyawanId: emp.id,
-                        periode: period
-                    }
-                }
-            });
-
-            if (existing) continue;
+            if (existingSet.has(emp.id)) continue;
 
             const salary = Number(emp.gajiPokok);
-            const tunjangan = 0; // Placeholder for now, can be fetched if added to model
+            const tunjangan = 0;
             const bonus = 0;
             const grossIncome = salary + tunjangan + bonus;
 
-            // 1. Calculate BPJS (Employee Share)
-            // Note: In real world, BPJS basis might differ (Gaji Pokok vs Total), assuming Gaji Pokok here
             const { bpjsKesehatan, bpjsKetenagakerjaan } = calculateBPJS(salary);
             const totalBpjsEmployee = bpjsKesehatan + bpjsKetenagakerjaan;
 
-            // 2. Calculate PPh 21 (TER) based on Gross Income
-            // Using statusPernikahan from employee record ("TK/0" default)
             const pph21 = calculatePPh21(grossIncome, emp.statusPernikahan || 'TK/0');
 
             const totalDeduction = totalBpjsEmployee + pph21;
             const net = grossIncome - totalDeduction;
 
-            const payroll = await prisma.penggajian.create({
-                data: {
-                    karyawanId: emp.id,
-                    periode: period,
-                    tanggalBayar: new Date(date || new Date()),
-                    gajiPokok: new Prisma.Decimal(salary),
-                    tunjangan: new Prisma.Decimal(tunjangan),
-                    lembur: new Prisma.Decimal(0),
-                    bonus: new Prisma.Decimal(bonus),
-                    totalPenghasilan: new Prisma.Decimal(grossIncome),
-                    potonganBpjs: new Prisma.Decimal(totalBpjsEmployee),
-                    potonganPph21: new Prisma.Decimal(pph21),
-                    potonganLainnya: new Prisma.Decimal(0),
-                    totalPotongan: new Prisma.Decimal(totalDeduction),
-                    netto: new Prisma.Decimal(net),
-                    status: 'DRAFT'
-                } as any
+            payrollsToCreate.push({
+                karyawanId: emp.id,
+                periode: period,
+                tanggalBayar: new Date(date || new Date()),
+                gajiPokok: new Prisma.Decimal(salary),
+                tunjangan: new Prisma.Decimal(tunjangan),
+                lembur: new Prisma.Decimal(0),
+                bonus: new Prisma.Decimal(bonus),
+                totalPenghasilan: new Prisma.Decimal(grossIncome),
+                potonganBpjs: new Prisma.Decimal(totalBpjsEmployee),
+                potonganPph21: new Prisma.Decimal(pph21),
+                potonganLainnya: new Prisma.Decimal(0),
+                totalPotongan: new Prisma.Decimal(totalDeduction),
+                netto: new Prisma.Decimal(net),
+                status: 'DRAFT'
             });
-            payrolls.push(payroll);
+        }
+
+        // 2. Batch create payrolls
+        if (payrollsToCreate.length > 0) {
+            await prisma.penggajian.createMany({
+                data: payrollsToCreate
+            });
         }
 
         res.json({
             success: true,
-            count: payrolls.length,
-            message: `Berhasil generate ${payrolls.length} data penggajian.`
+            count: payrollsToCreate.length,
+            message: `Berhasil generate ${payrollsToCreate.length} data penggajian.`
         });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error generating payroll:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }

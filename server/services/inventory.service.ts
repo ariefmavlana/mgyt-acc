@@ -25,6 +25,18 @@ export class InventoryService {
         }
     ) {
         for (const item of items) {
+            const currentStock = await tx.stokPersediaan.findUnique({
+                where: {
+                    persediaanId_gudangId: {
+                        persediaanId: item.persediaanId,
+                        gudangId: item.gudangId
+                    }
+                }
+            });
+
+            const saldoSebelum = currentStock ? Number(currentStock.kuantitas) : 0;
+            const saldoSesudah = saldoSebelum + item.qty;
+
             await tx.stokPersediaan.upsert({
                 where: {
                     persediaanId_gudangId: {
@@ -69,6 +81,8 @@ export class InventoryService {
                     kuantitas: item.qty,
                     harga: item.costPerUnit,
                     nilai: item.qty * item.costPerUnit,
+                    saldoSebelum,
+                    saldoSesudah,
                     referensi: data.refId,
                     keterangan: data.keterangan || `Penerimaan Stok (${data.refType})`
                 }
@@ -158,6 +172,18 @@ export class InventoryService {
                 throw new Error(`Stok tidak mencukupi untuk Persediaan ID ${item.persediaanId}. Sisa permintaan: ${remainingQty}`);
             }
 
+            const currentStock = await tx.stokPersediaan.findUnique({
+                where: {
+                    persediaanId_gudangId: {
+                        persediaanId: item.persediaanId,
+                        gudangId: item.gudangId
+                    }
+                }
+            });
+
+            const saldoSebelum = currentStock ? Number(currentStock.kuantitas) : 0;
+            const saldoSesudah = saldoSebelum - item.qty;
+
             await tx.stokPersediaan.update({
                 where: {
                     persediaanId_gudangId: {
@@ -181,6 +207,8 @@ export class InventoryService {
                     kuantitas: item.qty,
                     harga: totalCost / item.qty,
                     nilai: totalCost,
+                    saldoSebelum,
+                    saldoSesudah,
                     referensi: data.refId,
                     keterangan: data.keterangan || `Pengeluaran Stok (${data.refType})`
                 }

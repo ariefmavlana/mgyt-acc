@@ -35,12 +35,12 @@ export const uploadDocument = async (req: Request, res: Response) => {
         const document = await prisma.dokumenTransaksi.create({
             data: {
                 perusahaanId,
-                tipe: file.mimetype,
+                jenisFile: file.mimetype,
                 nama: file.originalname,
                 urlFile: file.filename,
                 ukuranFile: file.size,
                 kategori: kategoriDokumen,
-                keterangan,
+                deskripsi: keterangan,
 
                 // Linkage
                 transaksiId: entityType === 'TRANSACTION' ? entityId : undefined,

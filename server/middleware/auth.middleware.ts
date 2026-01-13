@@ -3,9 +3,13 @@ import { verifyAccessToken } from '../utils/jwt';
 import prisma from '../../lib/prisma';
 import { Pengguna, AksesPengguna, Role, UserRole } from '@prisma/client';
 
+export type AksesWithRole = AksesPengguna & {
+    roleRef?: any;
+};
+
 export interface AuthRequest extends Request {
-    user: Pengguna;
-    akses?: AksesPengguna;
+    user: any;
+    akses?: AksesWithRole;
     currentCompanyId?: string;
 }
 
@@ -51,11 +55,11 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
     authReq.user = currentUser;
     // Default to the first active company access if available
-    const userWithAccess = currentUser as any;
+    const aksesList = currentUser.aksesPerusahaan as AksesWithRole[];
 
-    if (userWithAccess.aksesPerusahaan?.[0]) {
-        authReq.akses = userWithAccess.aksesPerusahaan[0];
-        authReq.currentCompanyId = userWithAccess.aksesPerusahaan[0].perusahaanId;
+    if (aksesList?.[0]) {
+        authReq.akses = aksesList[0];
+        authReq.currentCompanyId = aksesList[0].perusahaanId;
     }
 
     next();

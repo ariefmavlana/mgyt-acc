@@ -23,12 +23,15 @@ export const tenantMiddleware = async (req: Request, res: Response, next: NextFu
         const userId = authReq.user?.id;
 
         if (userId) {
-            const access = await (prisma as any).aksesPengguna.findUnique({
+            const access = await prisma.aksesPengguna.findUnique({
                 where: {
                     penggunaId_perusahaanId: {
                         penggunaId: userId,
                         perusahaanId: companyId
                     }
+                },
+                include: {
+                    roleRef: true
                 }
             });
 

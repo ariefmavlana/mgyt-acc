@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma, TipeAkun } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import { startOfYear, endOfDay } from 'date-fns';
@@ -17,8 +18,8 @@ interface ReportParams {
 }
 
 // Helper to get summation of journals by account type
-const getAccountBalances = async (params: ReportParams, types: string[]) => {
-    const where: any = {
+const getAccountBalances = async (params: ReportParams, types: TipeAkun[]) => {
+    const where: Prisma.ChartOfAccountsWhereInput = {
         perusahaanId: params.perusahaanId,
         tipe: { in: types }
     };
@@ -171,8 +172,8 @@ const fetchIncomeStatement = async (perusahaanId: string, startDate?: string, en
         return acc;
     }, {} as Record<string, { debit: number, credit: number }>);
 
-    const revenues: any[] = [];
-    const expenses: any[] = [];
+    const revenues: (Prisma.ChartOfAccountsGetPayload<{ select: { id: true, kodeAkun: true, namaAkun: true, tipe: true } }> & { saldo: number })[] = [];
+    const expenses: (Prisma.ChartOfAccountsGetPayload<{ select: { id: true, kodeAkun: true, namaAkun: true, tipe: true } }> & { saldo: number })[] = [];
 
     accounts.forEach(acc => {
         const { debit = 0, credit = 0 } = aggregateMap[acc.id] || {};
@@ -221,9 +222,9 @@ export const getBalanceSheet = async (req: Request, res: Response) => {
         await cacheService.set(cacheKey, result, 900);
         res.setHeader('X-Cache', 'MISS');
         res.json(result);
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Balance Sheet Error:', error);
-        res.status(500).json({ message: 'Gagal menghasilkan Neraca', error });
+        res.status(500).json({ message: 'Gagal menghasilkan Neraca' });
     }
 };
 
@@ -300,7 +301,7 @@ export const getCashFlow = async (req: Request, res: Response) => {
             const isDebit = Number(move.debit) > 0;
             const amount = isDebit ? Number(move.debit) : -Number(move.kredit);
 
-            const contraEntry = move.jurnal.detail.find((d: any) => !cashAccountIds.includes(d.akunId));
+            const contraEntry = move.jurnal.detail.find((d) => !cashAccountIds.includes(d.akunId));
 
             if (contraEntry) {
                 const type = contraEntry.akun.tipe;
@@ -326,7 +327,7 @@ export const getCashFlow = async (req: Request, res: Response) => {
 
         res.json(result);
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Cash Flow Error:', error);
         res.status(500).json({ message: 'Gagal menghasilkan Laporan Arus Kas' });
     }
@@ -386,7 +387,7 @@ export const getTrialBalance = async (req: Request, res: Response) => {
             }
         });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Trial Balance Error:', error);
         res.status(500).json({ message: 'Gagal menghasilkan Neraca Saldo' });
     }
@@ -462,8 +463,8 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
 
             return {
                 date: tx.jurnal.tanggal,
-                ref: tx.jurnal.noJurnal,
-                description: tx.jurnal.keterangan || tx.jurnal.noJurnal,
+                ref: tx.jurnal.nomorJurnal,
+                description: tx.jurnal.deskripsi || tx.jurnal.nomorJurnal,
                 debit: deb,
                 credit: cred,
                 balance: currentBalance
@@ -482,7 +483,7 @@ export const getGeneralLedger = async (req: Request, res: Response) => {
             closingBalance: currentBalance
         });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('General Ledger Error:', error);
         res.status(500).json({ message: 'Gagal menghasilkan Buku Besar' });
     }
@@ -604,7 +605,7 @@ export const exportReport = async (req: Request, res: Response) => {
 
         res.status(400).json({ message: 'Invalid format or type' });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Export Error:', error);
         res.status(500).json({ message: 'Export failed' });
     }
@@ -616,7 +617,7 @@ export const getARAging = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
         const report = await ReportingService.calculateARAging(perusahaanId);
         res.json(report);
-    } catch (error) {
+    } catch {
         res.status(500).json({ message: 'Gagal mengambil aging piutang' });
     }
 };
@@ -627,7 +628,7 @@ export const getAPAging = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
         const report = await ReportingService.calculateAPAging(perusahaanId);
         res.json(report);
-    } catch (error) {
+    } catch {
         res.status(500).json({ message: 'Gagal mengambil aging hutang' });
     }
 };
@@ -639,7 +640,7 @@ export const triggerReminders = async (req: Request, res: Response) => {
             message: 'Reminder processing complete',
             results
         });
-    } catch (error) {
+    } catch {
         res.status(500).json({ message: 'Gagal memproses pengingat pembayaran' });
     }
 };

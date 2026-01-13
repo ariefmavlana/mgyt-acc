@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
-import ExcelJS from 'exceljs';
-import { AccountingEngine } from '../lib/accounting-engine';
+import prisma from '../../lib/prisma';
 import { TipeTransaksi } from '@prisma/client';
 
 export const importCSV = async (req: Request, res: Response) => {
@@ -18,7 +17,7 @@ export const importCSV = async (req: Request, res: Response) => {
             const imports = [];
 
             // Simulating CSV parsing if it's a string
-            let rows = Array.isArray(data) ? data : [];
+            const rows = Array.isArray(data) ? data : [];
 
             for (const row of rows) {
                 // row: { tanggal, tipe, deskripsi, items: [{ kodeAkun, debit, kredit }] }
@@ -48,8 +47,8 @@ export const importCSV = async (req: Request, res: Response) => {
                         tanggal,
                         tipe: row.tipe as TipeTransaksi,
                         deskripsi: row.deskripsi,
-                        totalAmount: row.totalAmount,
-                        createdById: authReq.user.id
+                        total: row.totalAmount,
+                        penggunaId: authReq.user.id
                     }
                 });
 
@@ -61,9 +60,11 @@ export const importCSV = async (req: Request, res: Response) => {
                         nomorVoucher,
                         tanggal,
                         tipe: 'JURNAL_UMUM',
-                        totalAmount: row.totalAmount,
-                        keterangan: row.deskripsi,
-                        status: 'DIPOSTING'
+                        totalDebit: row.totalAmount,
+                        totalKredit: row.totalAmount,
+                        deskripsi: row.deskripsi,
+                        status: 'DIPOSTING',
+                        dibuatOlehId: authReq.user.id
                     }
                 });
 
@@ -86,7 +87,7 @@ export const importCSV = async (req: Request, res: Response) => {
                 // Process Items
                 for (const [index, item] of row.items.entries()) {
                     const account = await tx.chartOfAccounts.findFirst({
-                        where: { perusahaanId, kode: item.kodeAkun }
+                        where: { perusahaanId, kodeAkun: item.kodeAkun }
                     });
                     if (!account) throw new Error(`Akun ${item.kodeAkun} tidak ditemukan`);
 
@@ -122,8 +123,9 @@ export const importCSV = async (req: Request, res: Response) => {
             message: `Berhasil mengimport ${result.length} transaksi`,
             ids: result
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(error);
-        res.status(400).json({ message: error.message || 'Gagal mengimport data' });
+        const message = error instanceof Error ? error.message : 'Gagal mengimport data';
+        res.status(400).json({ message });
     }
 };

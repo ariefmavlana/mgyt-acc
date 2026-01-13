@@ -78,7 +78,7 @@ export function CompanySelector() {
                             <CommandItem
                                 onSelect={() => {
                                     setOpen(false);
-                                    router.push('/companies/new');
+                                    router.push('/dashboard/companies/new');
                                 }}
                                 className="flex items-center gap-2 cursor-pointer py-2 px-3 text-primary font-medium hover:bg-primary/5 italic"
                             >

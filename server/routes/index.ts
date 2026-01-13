@@ -11,6 +11,14 @@ import reportingRoutes from './reporting.routes';
 import auditRoutes from './audit.routes';
 import hrRoutes from './hr.routes';
 import documentRoutes from './documents.routes';
+import inventoryRoutes from './inventory.routes';
+import importRoutes from './import.routes';
+import periodRoutes from './period.routes';
+import onboardingRoutes from './onboarding.routes';
+import dashboardRoutes from './dashboard.routes';
+import contactRoutes from './contact.routes';
+import purchaseRoutes from './purchase.routes';
+import templateRoutes from './template.routes';
 
 const router = express.Router();
 
@@ -25,5 +33,13 @@ router.use('/reports', reportingRoutes);
 router.use('/system/audit', auditRoutes);
 router.use('/hr', hrRoutes);
 router.use('/documents', documentRoutes);
+router.use('/inventory', inventoryRoutes);
+router.use('/import', importRoutes);
+router.use('/periods', periodRoutes);
+router.use('/onboarding', onboardingRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/contacts', contactRoutes);
+router.use('/purchases', purchaseRoutes);
+router.use('/templates', templateRoutes);
 
 export default router;

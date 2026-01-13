@@ -1,16 +1,15 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export const getCustomers = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { search } = req.query;
 
-        const where: any = {
+        const where: Prisma.PelangganWhereInput = {
             perusahaanId: authReq.currentCompanyId!,
-            // You might want a type filter if Pelanggan is just one type of 'Partner'
-            // But if 'Pelanggan' is a dedicated model, just query it.
         };
 
         if (search) {
@@ -24,7 +23,8 @@ export const getCustomers = async (req: Request, res: Response) => {
         });
 
         res.json(customers);
-    } catch (error) {
+    } catch (error: unknown) {
+        console.error('Fetch Customers Error:', error);
         res.status(500).json({ message: 'Gagal mengambil data pelanggan' });
     }
 };
@@ -47,7 +47,8 @@ export const createCustomer = async (req: Request, res: Response) => {
         });
 
         res.status(201).json(customer);
-    } catch (error) {
+    } catch (error: unknown) {
+        console.error('Create Customer Error:', error);
         res.status(500).json({ message: 'Gagal membuat pelanggan' });
     }
 }

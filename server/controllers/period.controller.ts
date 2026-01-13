@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
-import { AccountingEngine } from '../lib/accounting-engine';
 
 export const getPeriods = async (req: Request, res: Response) => {
     try {
@@ -14,7 +13,7 @@ export const getPeriods = async (req: Request, res: Response) => {
         });
 
         res.json(periods);
-    } catch (error) {
+    } catch (error: unknown) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil daftar periode' });
     }
@@ -73,8 +72,46 @@ export const closePeriod = async (req: Request, res: Response) => {
             message: 'Periode berhasil ditutup. Transaksi pada periode ini sekarang terkunci.',
             period: result
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(error);
-        res.status(400).json({ message: error.message || 'Gagal menutup periode' });
+        const message = error instanceof Error ? error.message : 'Gagal menutup periode';
+        res.status(400).json({ message });
+    }
+};
+
+export const createPeriod = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { tahun, bulan, nama, tanggalMulai, tanggalAkhir } = req.body;
+
+        if (!tahun || !bulan || !nama || !tanggalMulai || !tanggalAkhir) {
+            return res.status(400).json({ message: 'Semua field wajib diisi' });
+        }
+
+        const existing = await prisma.periodeAkuntansi.findFirst({
+            where: { perusahaanId, tahun, bulan }
+        });
+
+        if (existing) {
+            return res.status(400).json({ message: 'Periode untuk tahun dan bulan ini sudah ada' });
+        }
+
+        const period = await prisma.periodeAkuntansi.create({
+            data: {
+                perusahaanId,
+                tahun: parseInt(tahun),
+                bulan: parseInt(bulan),
+                nama,
+                tanggalMulai: new Date(tanggalMulai),
+                tanggalAkhir: new Date(tanggalAkhir),
+                status: 'TERBUKA'
+            }
+        });
+
+        res.json(period);
+    } catch (error: unknown) {
+        console.error(error);
+        res.status(500).json({ message: 'Gagal membuat periode baru' });
     }
 };

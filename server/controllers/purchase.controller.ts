@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { createPurchaseSchema } from '../validators/purchase.validator';
 import { addDays } from 'date-fns';
 import { InventoryService } from '../services/inventory.service';
@@ -163,8 +164,8 @@ export const createPurchase = async (req: Request, res: Response) => {
             });
 
             const apAccount = await tx.chartOfAccounts.findFirst({
-                where: { perusahaanId, tipe: 'KEWAJIBAN', kategoriAkun: 'HUTANG_USAHA' }
-            }) || await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'KEWAJIBAN' } });
+                where: { perusahaanId, tipe: 'LIABILITAS', kategoriLiabilitas: 'HUTANG_USAHA' }
+            }) || await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'LIABILITAS' } });
 
             if (!apAccount) throw new Error('Akun Hutang Usaha tidak ditemukan');
 
@@ -254,9 +255,10 @@ export const createPurchase = async (req: Request, res: Response) => {
             message: 'Pembelian berhasil dicatat',
             data: result
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Purchase Creation Error:', error);
-        res.status(500).json({ message: error.message || 'Gagal mencatat pembelian' });
+        const message = error instanceof Error ? error.message : 'Gagal mencatat pembelian';
+        res.status(500).json({ message });
     }
 };
 
@@ -268,7 +270,7 @@ export const getPurchases = async (req: Request, res: Response) => {
         const limit = req.query.limit ? String(req.query.limit) : '10';
         const skip = (Number(page) - 1) * Number(limit);
 
-        const where: any = {
+        const where: Prisma.TransaksiWhereInput = {
             perusahaanId: authReq.currentCompanyId,
             tipe: 'PEMBELIAN'
         };
@@ -295,7 +297,7 @@ export const getPurchases = async (req: Request, res: Response) => {
             }
         });
 
-    } catch (error) {
+    } catch (error: unknown) {
         res.status(500).json({ message: 'Gagal mengambil data pembelian' });
     }
 };

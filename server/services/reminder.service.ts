@@ -1,4 +1,4 @@
-import { addDays, differenceInDays, startOfDay } from 'date-fns';
+import { differenceInDays, startOfDay } from 'date-fns';
 import prisma from '../../lib/prisma';
 
 export interface ReminderResult {
@@ -54,7 +54,7 @@ export class ReminderService {
                 days = Math.abs(diff);
             }
 
-            if (reminderType) {
+            if (reminderType && p.transaksi) {
                 const emailSent = await this.sendMockEmail({
                     to: p.pelanggan?.email || 'N/A',
                     subject: this.getSubject(reminderType, days),
@@ -62,7 +62,7 @@ export class ReminderService {
                 });
 
                 results.push({
-                    invoiceId: p.transaksiId,
+                    invoiceId: p.transaksiId || '',
                     nomorInvoice: p.transaksi.nomorTransaksi,
                     pelangganNama: p.pelanggan?.nama || 'N/A',
                     type: reminderType,

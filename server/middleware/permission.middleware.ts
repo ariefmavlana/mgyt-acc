@@ -24,8 +24,8 @@ export const requirePermission = (...requiredPermissions: Permission[]) => {
 
         let roleForCheck: any = null; // Should be Role enum or Role model
 
-        if (authReq.akses && authReq.akses.roleRef) {
-            roleForCheck = authReq.akses.roleRef;
+        if (authReq.akses && (authReq.akses as any).roleRef) {
+            roleForCheck = (authReq.akses as any).roleRef;
         } else if (authReq.akses && authReq.akses.roleEnum) {
             // Legacy/Fallback for simpler roles if no Role model attached
             // This path might need fetching the actual Role model if we want granular permissions

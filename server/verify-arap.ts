@@ -39,7 +39,7 @@ async function runVerification() {
         }
 
         const COMPANY_ID = company.id;
-        const USER = { id: user.id, username: user.nama };
+        const USER = { id: user.id, username: user.namaLengkap };
 
         console.log(`Using Company: ${company.nama} (${COMPANY_ID})`);
 
@@ -101,7 +101,7 @@ async function runVerification() {
         console.log('\n[STEP 2] Checking Aging Schedule...');
         const agingReport = await ReportingService.calculateARAging(COMPANY_ID);
         // Find our customer
-        const customerAging = agingReport.details.find((d: any) => d.pelangganId === customer.id);
+        const customerAging = agingReport.find((d: any) => d.pelangganId === customer.id);
         if (customerAging) {
             console.log('Aging Bucket for Customer:', customerAging);
             // Expect some amount in 1-30 or current depending on calculation
@@ -113,7 +113,7 @@ async function runVerification() {
         console.log('\n[STEP 3] Triggering Reminders...');
         const reminders = await ReminderService.processReminders();
         // Check if our invoice is in the list
-        const reminderSent = reminders.sent.find((r: any) => r.invoice === invoice.nomorTransaksi);
+        const reminderSent = reminders.find((r: any) => r.nomorInvoice === invoice.nomorTransaksi);
         if (reminderSent) {
             console.log(`[SUCCESS] Reminder generated for ${invoice.nomorTransaksi} (${reminderSent.type})`);
         } else {

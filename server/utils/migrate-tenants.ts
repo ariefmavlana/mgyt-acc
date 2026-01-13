@@ -15,11 +15,9 @@ async function main() {
     console.log(`Found ${users.length} users to migrate.`);
 
     for (const user of users) {
-        // @ts-ignore - perusahaanId still exists in DB but might be hidden by Prisma Client if I run generate without it
-        // However, I kept it in schema temporarily, so it should be there.
-        const perusahaanId = (user as any).perusahaanId;
-        const cabangId = (user as any).cabangId;
-        const role = (user as any).role;
+        const perusahaanId = (user as { perusahaanId?: string }).perusahaanId;
+        const cabangId = (user as { cabangId?: string }).cabangId;
+        const role = (user as { role?: any }).role;
 
         if (perusahaanId) {
             console.log(`Migrating user ${user.username} to company ${perusahaanId}...`);
@@ -28,7 +26,7 @@ async function main() {
                     penggunaId: user.id,
                     perusahaanId: perusahaanId,
                     cabangId: cabangId,
-                    role: role,
+                    roleEnum: role as any,
                     isDefault: true,
                     isAktif: true
                 }

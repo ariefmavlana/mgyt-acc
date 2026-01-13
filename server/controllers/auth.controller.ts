@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { registerSchema, loginSchema, changePasswordSchema } from '../validators/auth.validator';
+import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
+import { RoleEnum } from '@prisma/client';
 import { hashPassword, comparePassword } from '../utils/password';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../utils/jwt';
-import { Role } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const cookieOptions = {
@@ -75,7 +76,7 @@ export const register = async (req: Request, res: Response) => {
                 data: {
                     penggunaId: newUser.id,
                     perusahaanId: perusahaanId,
-                    role: (validatedData.role as Role) || 'ADMIN',
+                    roleEnum: (validatedData.role as RoleEnum) || 'ADMIN',
                     isDefault: true,
                     isAktif: true
                 },
@@ -116,10 +117,9 @@ export const register = async (req: Request, res: Response) => {
             user: userWithoutPassword
         });
     } catch (error: unknown) {
-        if (error instanceof Error && error.name === 'ZodError') {
-            const zodError = error as any;
-            const message = zodError.errors?.[0]?.message || 'Kesalahan validasi data';
-            return res.status(400).json({ message, errors: zodError.errors });
+        if (error instanceof ZodError) {
+            const message = error.errors?.[0]?.message || 'Kesalahan validasi data';
+            return res.status(400).json({ message, errors: error.errors });
         }
         console.error(error);
         res.status(500).json({ message: 'Error server saat pendaftaran' });
@@ -232,7 +232,7 @@ export const login = async (req: Request, res: Response) => {
                 companies: user.aksesPerusahaan.map(a => ({
                     id: a.perusahaanId,
                     nama: a.perusahaan.nama,
-                    role: a.role,
+                    role: a.roleEnum,
                     isDefault: a.isDefault
                 }))
             },
@@ -240,9 +240,8 @@ export const login = async (req: Request, res: Response) => {
             accessToken
         });
     } catch (error: unknown) {
-        if (error instanceof Error && error.name === 'ZodError') {
-            const zodError = error as any;
-            const message = zodError.errors?.[0]?.message || 'Email atau password wajib diisi';
+        if (error instanceof ZodError) {
+            const message = error.errors?.[0]?.message || 'Email atau password wajib diisi';
             return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat login' });
@@ -284,7 +283,7 @@ export const getMe = async (req: Request, res: Response) => {
             companies: user.aksesPerusahaan.map(a => ({
                 id: a.perusahaanId,
                 nama: a.perusahaan.nama,
-                role: a.role,
+                role: a.roleEnum,
                 isDefault: a.isDefault
             }))
         },
@@ -300,7 +299,7 @@ export const switchCompany = async (req: Request, res: Response) => {
         if (!companyId) return res.status(400).json({ message: 'Company ID is required' });
 
         // Validate access
-        const access = await (prisma as any).aksesPengguna.findUnique({
+        const access = await prisma.aksesPengguna.findUnique({
             where: {
                 penggunaId_perusahaanId: {
                     penggunaId: authReq.user.id,
@@ -318,10 +317,10 @@ export const switchCompany = async (req: Request, res: Response) => {
         res.json({
             message: `Switched to ${access.perusahaan.nama}`,
             companyId: access.perusahaanId,
-            role: access.role
+            role: access.roleEnum
         });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Switch Company Error:', error);
         res.status(500).json({ message: 'Internal Server Error' });
     }
@@ -427,9 +426,8 @@ export const changePassword = async (req: Request, res: Response) => {
 
         res.json({ message: 'Password berhasil diubah' });
     } catch (error: unknown) {
-        if (error instanceof Error && error.name === 'ZodError') {
-            const zodError = error as any;
-            const message = zodError.errors?.[0]?.message || 'Kesalahan validasi data';
+        if (error instanceof ZodError) {
+            const message = error.errors?.[0]?.message || 'Kesalahan validasi data';
             return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat mengubah password' });

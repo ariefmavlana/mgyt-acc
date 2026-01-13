@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { createInvoiceSchema } from '../validators/invoice.validator';
 import { addDays, differenceInDays, format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -297,9 +298,10 @@ export const createInvoice = async (req: Request, res: Response) => {
             message: 'Invoice berhasil dibuat',
             data: result
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Invoice Creation Error:', error);
-        res.status(500).json({ message: error.message || 'Gagal membuat invoice' });
+        const message = error instanceof Error ? error.message : 'Gagal membuat invoice';
+        res.status(500).json({ message });
     }
 };
 
@@ -312,7 +314,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         const search = req.query.search ? String(req.query.search) : undefined;
         const skip = (Number(page) - 1) * Number(limit);
 
-        const where: any = {
+        const where: Prisma.TransaksiWhereInput = {
             perusahaanId: authReq.currentCompanyId,
             tipe: 'PENJUALAN'
         };
@@ -584,9 +586,10 @@ export const getAgingSchedule = async (req: Request, res: Response) => {
         }
 
         res.json(Object.values(customerAging));
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Aging Schedule Error:', error);
-        res.status(500).json({ message: `Gagal mengambil aging schedule: ${error.message}` });
+        const message = error instanceof Error ? error.message : 'Gagal mengambil aging schedule';
+        res.status(500).json({ message });
     }
 };
 
@@ -616,8 +619,9 @@ export const getInvoiceAging = async (req: Request, res: Response) => {
                         daysOverdue <= 90 ? '61-90 Days' : '> 90 Days'
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Invoice Aging Error:', error);
-        res.status(500).json({ message: `Gagal mengambil aging invoice: ${error.message}` });
+        const message = error instanceof Error ? error.message : 'Gagal mengambil aging invoice';
+        res.status(500).json({ message });
     }
 };

@@ -97,12 +97,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             cashBalance
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Dashboard Stats Error:', error);
-        // Return explicit error details for debugging
+        const message = error instanceof Error ? error.message : 'Gagal memuat statistik dashboard';
         res.status(500).json({
             message: 'Gagal memuat statistik dashboard',
-            debug: error.message
+            debug: message
         });
     }
 };

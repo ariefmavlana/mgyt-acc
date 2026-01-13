@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { createCompanySchema, updateCompanySchema, settingsSchema } from '../validators/company.validator';
+import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { TierPaket } from '@prisma/client';
@@ -41,7 +42,7 @@ export const getCompanies = async (req: Request, res: Response) => {
                 totalPages: Math.ceil(total / limit)
             }
         });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil daftar perusahaan' });
     }
@@ -67,7 +68,7 @@ export const getCompany = async (req: Request, res: Response) => {
         }
 
         res.json(company);
-    } catch (error) {
+    } catch (error: unknown) {
         console.error(error);
         res.status(500).json({ message: 'Gagal mengambil detail perusahaan' });
     }
@@ -92,7 +93,7 @@ export const createCompany = async (req: Request, res: Response) => {
                 data: {
                     penggunaId: userId,
                     perusahaanId: comp.id,
-                    role: 'ADMIN', // creator defaults to ADMIN
+                    roleEnum: 'ADMIN', // creator defaults to ADMIN
                     isAktif: true,
                     isDefault: true
                 }
@@ -120,9 +121,8 @@ export const createCompany = async (req: Request, res: Response) => {
 
         res.status(201).json(company);
     } catch (error: unknown) {
-        if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'ZodError') {
-            const zodError = error as unknown as { errors: Array<{ message: string }> };
-            return res.status(400).json({ message: zodError.errors[0].message });
+        if (error instanceof ZodError) {
+            return res.status(400).json({ message: error.errors[0].message });
         }
         console.error(error);
         res.status(500).json({ message: 'Gagal membuat perusahaan' });
@@ -154,9 +154,8 @@ export const updateCompany = async (req: Request, res: Response) => {
 
         res.json(updatedCompany);
     } catch (error: unknown) {
-        if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'ZodError') {
-            const zodError = error as unknown as { errors: Array<{ message: string }> };
-            return res.status(400).json({ message: zodError.errors[0].message });
+        if (error instanceof ZodError) {
+            return res.status(400).json({ message: error.errors[0].message });
         }
         res.status(500).json({ message: 'Gagal memperbarui perusahaan' });
     }
@@ -215,9 +214,8 @@ export const updateSettings = async (req: Request, res: Response) => {
 
         res.json(updatedCompany);
     } catch (error: unknown) {
-        if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'ZodError') {
-            const zodError = error as unknown as { errors: Array<{ message: string }> };
-            return res.status(400).json({ message: zodError.errors[0].message });
+        if (error instanceof ZodError) {
+            return res.status(400).json({ message: error.errors[0].message });
         }
         res.status(500).json({ message: 'Gagal memperbarui pengaturan' });
     }
@@ -247,8 +245,28 @@ export const getWarehouses = async (req: Request, res: Response) => {
         });
 
         res.json(warehouses);
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Get Warehouses Error:', error);
         res.status(500).json({ message: 'Gagal mengambil daftar gudang' });
+    }
+};
+export const getBranches = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId;
+
+        if (!perusahaanId) {
+            return res.status(400).json({ message: 'Context perusahaan tidak ditemukan' });
+        }
+
+        const branches = await prisma.cabang.findMany({
+            where: { perusahaanId },
+            orderBy: { nama: 'asc' }
+        });
+
+        res.json(branches);
+    } catch (error: unknown) {
+        console.error('Get Branches Error:', error);
+        res.status(500).json({ message: 'Gagal mengambil daftar cabang' });
     }
 };

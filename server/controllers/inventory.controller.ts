@@ -1,7 +1,8 @@
-
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
+import { InventoryService } from '../services/inventory.service';
 import { stockMovementSchema } from '../validators/inventory.validator';
 
 export const getStock = async (req: Request, res: Response) => {
@@ -10,7 +11,7 @@ export const getStock = async (req: Request, res: Response) => {
         const { warehouseId, productId } = req.query;
         const perusahaanId = authReq.currentCompanyId!;
 
-        const where: any = {
+        const where: Prisma.StokPersediaanWhereInput = {
             persediaan: { perusahaanId }
         };
 
@@ -40,15 +41,73 @@ export const getStock = async (req: Request, res: Response) => {
 
         res.json(stocks);
     } catch (error) {
+        console.error('Get Stock Error:', error);
         res.status(500).json({ message: 'Gagal mengambil data stok' });
+    }
+};
+
+export const getWarehouses = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+
+        const warehouses = await prisma.gudang.findMany({
+            where: {
+                cabang: { perusahaanId }
+            },
+            include: {
+                cabang: { select: { nama: true } }
+            }
+        });
+
+        res.json(warehouses);
+    } catch (error) {
+        console.error('Get Warehouses Error:', error);
+        res.status(500).json({ message: 'Gagal mengambil data gudang' });
+    }
+};
+
+export const createWarehouse = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { kode, nama, alamat, telepon, penanggungJawab, cabangId, isUtama } = req.body;
+
+        if (!kode || !nama || !cabangId) {
+            return res.status(400).json({ message: 'Kode, Nama, dan Cabang wajib diisi' });
+        }
+
+        // Verify cabang belongs to perusahaan
+        const cabang = await prisma.cabang.findFirst({
+            where: { id: cabangId, perusahaanId }
+        });
+
+        if (!cabang) {
+            return res.status(403).json({ message: 'Cabang tidak valid' });
+        }
+
+        const warehouse = await prisma.gudang.create({
+            data: {
+                kode,
+                nama,
+                alamat,
+                telepon,
+                penanggungJawab,
+                cabangId,
+                isUtama: !!isUtama
+            }
+        });
+
+        res.status(201).json(warehouse);
+    } catch (error) {
+        console.error('Create Warehouse Error:', error);
+        res.status(500).json({ message: 'Gagal membuat gudang baru' });
     }
 };
 
 export const recordMovement = async (req: Request, res: Response) => {
     try {
-        const authReq = req as AuthRequest;
         const validatedData = stockMovementSchema.parse(req.body);
-        const perusahaanId = authReq.currentCompanyId!;
 
         const result = await prisma.$transaction(async (tx) => {
             const results = [];
@@ -100,7 +159,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                     }
 
                     // TRANSFER OUT
-                    await InventoryService.removeStock(tx as any, {
+                    await InventoryService.removeStock(tx as Prisma.TransactionClient, {
                         persediaanId,
                         gudangId: validatedData.gudangId,
                         qty: absQty,
@@ -111,7 +170,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                     });
 
                     // TRANSFER IN
-                    await InventoryService.addStock(tx as any, {
+                    await InventoryService.addStock(tx as Prisma.TransactionClient, {
                         persediaanId,
                         gudangId: targetGudangId,
                         qty: absQty,
@@ -136,7 +195,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                             throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk}. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
                         }
 
-                        await InventoryService.removeStock(tx as any, {
+                        await InventoryService.removeStock(tx as Prisma.TransactionClient, {
                             persediaanId,
                             gudangId: validatedData.gudangId,
                             qty: absQty,
@@ -146,7 +205,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                             keterangan: validatedData.keterangan || 'Pengurangan Stok'
                         });
                     } else {
-                        await InventoryService.addStock(tx as any, {
+                        await InventoryService.addStock(tx as Prisma.TransactionClient, {
                             persediaanId,
                             gudangId: validatedData.gudangId,
                             qty: absQty,
@@ -166,9 +225,10 @@ export const recordMovement = async (req: Request, res: Response) => {
         });
 
         res.status(201).json({ message: 'Pergerakan stok berhasil dicatat', data: result });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Stock Movement Error:', error);
-        res.status(500).json({ message: error.message || 'Gagal mencatat pemindahan stok' });
+        const message = error instanceof Error ? error.message : 'Gagal mencatat pemindahan stok';
+        res.status(500).json({ message });
     }
 };
 
@@ -179,7 +239,7 @@ export const getMovementHistory = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
         const skip = (Number(page) - 1) * Number(limit);
 
-        const where: any = {
+        const where: Prisma.MutasiPersediaanWhereInput = {
             persediaan: { perusahaanId }
         };
         if (warehouseId) where.gudangId = String(warehouseId);

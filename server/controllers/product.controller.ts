@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { createProductSchema, updateProductSchema } from '../validators/product.validator';
+import { ZodError } from 'zod';
 
 export const getProducts = async (req: Request, res: Response) => {
     try {
@@ -12,7 +14,7 @@ export const getProducts = async (req: Request, res: Response) => {
         const category = req.query.category ? String(req.query.category) : undefined;
         const skip = (page - 1) * limit;
 
-        const where: any = {
+        const where: Prisma.ProdukWhereInput = {
             perusahaanId: authReq.currentCompanyId!,
             isAktif: true
         };
@@ -53,7 +55,7 @@ export const getProducts = async (req: Request, res: Response) => {
                 totalPages: Math.ceil(total / limit)
             }
         });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Get Products Error:', error);
         res.status(500).json({ message: 'Gagal mengambil data produk' });
     }
@@ -75,7 +77,7 @@ export const getProduct = async (req: Request, res: Response) => {
         if (!product) return res.status(404).json({ message: 'Produk tidak ditemukan' });
 
         res.json(product);
-    } catch (error) {
+    } catch {
         res.status(500).json({ message: 'Gagal mengambil detail produk' });
     }
 };
@@ -143,9 +145,13 @@ export const createProduct = async (req: Request, res: Response) => {
         });
 
         res.status(201).json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({ message: error.errors[0].message });
+        }
         console.error('Create Product Error:', error);
-        res.status(500).json({ message: error.message || 'Gagal membuat produk' });
+        const message = error instanceof Error ? error.message : 'Gagal membuat produk';
+        res.status(500).json({ message });
     }
 };
 
@@ -182,8 +188,12 @@ export const updateProduct = async (req: Request, res: Response) => {
         }
 
         res.json(product);
-    } catch (error: any) {
-        res.status(500).json({ message: error.message || 'Gagal mengupdate produk' });
+    } catch (error: unknown) {
+        if (error instanceof ZodError) {
+            return res.status(400).json({ message: error.errors[0].message });
+        }
+        const message = error instanceof Error ? error.message : 'Gagal mengupdate produk';
+        res.status(500).json({ message });
     }
 };
 
@@ -199,7 +209,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
         });
 
         res.json({ message: 'Produk dinonaktifkan' });
-    } catch (error) {
+    } catch {
         res.status(500).json({ message: 'Gagal menghapus produk' });
     }
 };

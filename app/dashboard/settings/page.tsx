@@ -6,16 +6,21 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, Settings, Shield, Save, Loader2 } from 'lucide-react';
+import { Building2, Users, Settings, Shield, Save, Loader2, Warehouse } from 'lucide-react';
 import { useCompany } from '@/hooks/use-company';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { toast } from 'sonner';
+import { useSearchParams } from 'next/navigation';
+import { PeriodSettings } from '@/components/settings/period-settings';
+import { WarehouseSettings } from '@/components/inventory/warehouse-settings';
 
 export default function SettingsPage() {
     const { user } = useRequireAuth();
     const companyId = user?.perusahaan?.id;
     const { currentCompany: company, loading: isLoading, updateCompany: updateCompanyFn } = useCompany();
     const [isSaving, setIsSaving] = useState(false);
+    const searchParams = useSearchParams();
+    const defaultTab = searchParams.get('tab') || 'company';
 
     const [form, setForm] = useState({
         nama: '',
@@ -50,7 +55,7 @@ export default function SettingsPage() {
 
             // Clean payload: remove empty strings to avoid Zod validation errors (e.g. min(5))
             // and ensure we don't send invalid data formats
-            const payload: any = { ...form };
+            const payload: Record<string, string> = { ...form };
 
             Object.keys(payload).forEach(key => {
                 if (payload[key] === '') {
@@ -87,10 +92,12 @@ export default function SettingsPage() {
             </div>
 
             {/* Tabs Interface */}
-            <Tabs defaultValue="company" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mb-8">
+            <Tabs defaultValue={defaultTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-6 lg:w-[900px] mb-8">
                     <TabsTrigger value="company">Profil Perusahaan</TabsTrigger>
                     <TabsTrigger value="users">Pengguna</TabsTrigger>
+                    <TabsTrigger value="periods">Periode</TabsTrigger>
+                    <TabsTrigger value="warehouse" className="gap-2"><Warehouse className="h-4 w-4" /> Gudang</TabsTrigger>
                     <TabsTrigger value="security">Keamanan</TabsTrigger>
                     <TabsTrigger value="system">Sistem</TabsTrigger>
                 </TabsList>
@@ -170,6 +177,16 @@ export default function SettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* Periods Tab */}
+                <TabsContent value="periods">
+                    <PeriodSettings />
+                </TabsContent>
+
+                {/* Warehouse Tab */}
+                <TabsContent value="warehouse">
+                    <WarehouseSettings />
                 </TabsContent>
 
                 {/* Security Tab */}
