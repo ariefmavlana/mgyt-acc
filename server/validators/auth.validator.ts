@@ -10,7 +10,7 @@ export const registerSchema = z.object({
         .regex(/[A-Z]/, 'Password harus mengandung setidaknya satu huruf besar')
         .regex(/[a-z]/, 'Password harus mengandung setidaknya satu huruf kecil')
         .regex(/[0-9]/, 'Password harus mengandung setidaknya satu angka')
-        .regex(/[^A-Za-z0-0]/, 'Password harus mengandung setidaknya satu karakter khusus'),
+        .regex(/[^A-Za-z0-9]/, 'Password harus mengandung setidaknya satu karakter khusus'),
     confirmPassword: z.string(),
     role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
     namaPerusahaan: z.string().min(2, 'Nama perusahaan harus minimal 2 karakter').optional(),

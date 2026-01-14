@@ -109,6 +109,6 @@
     "unrs-resolver"
   ],
   "prisma": {
-    "seed": "bun prisma/seed.ts"
+    "seed": "bun prisma/seed-roles.ts"
   }
 }

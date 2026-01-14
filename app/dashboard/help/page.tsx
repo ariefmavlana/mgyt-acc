@@ -45,7 +45,7 @@ export default function HelpPage() {
                         <AccordionItem value="item-3">
                             <AccordionTrigger>Apakah laporan keuangan terupdate secara otomatis?</AccordionTrigger>
                             <AccordionContent>
-                                Ya, Mgyt Accounting menggunakan <em>Real-time Engine</em>. Setiap kali Anda menyimpan transaksi, saldo akun dan laporan keuangan (Neraca, Laba Rugi) akan terupdate seketika tanpa perlu proses "tutup buku" manual untuk melihat saldo harian.
+                                Ya, Mgyt Accounting menggunakan <em>Real-time Engine</em>. Setiap kali Anda menyimpan transaksi, saldo akun dan laporan keuangan (Neraca, Laba Rugi) akan terupdate seketika tanpa perlu proses &quot;tutup buku&quot; manual untuk melihat saldo harian.
                             </AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="item-4">
@@ -59,7 +59,7 @@ export default function HelpPage() {
                         <AccordionItem value="item-5">
                             <AccordionTrigger>Bagaimana cara melakukan Stock Opname?</AccordionTrigger>
                             <AccordionContent>
-                                Masuk ke menu <strong>Persediaan (Inventory)</strong>, pilih gudang yang dituju, dan gunakan fitur "Stock Opname". Anda bisa mencatat selisih stok fisik dan sistem, yang kemudian akan otomatis dibuatkan jurnal penyesuaian persediaan.
+                                Masuk ke menu <strong>Persediaan (Inventory)</strong>, pilih gudang yang dituju, dan gunakan fitur &quot;Stock Opname&quot;. Anda bisa mencatat selisih stok fisik dan sistem, yang kemudian akan otomatis dibuatkan jurnal penyesuaian persediaan.
                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>

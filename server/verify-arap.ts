@@ -6,23 +6,41 @@ import { createTransaction } from './controllers/transaction.controller';
 
 const prisma = new PrismaClient();
 
-const mockReq = (body: any, user: any, companyId: string, query: any = {}) => ({
+// Basic Mock Interfaces
+interface MockRequest {
+    body: Record<string, unknown>;
+    user: { id: string; username: string };
+    currentCompanyId: string;
+    params: Record<string, string>;
+    query: Record<string, unknown>;
+}
+
+interface MockResponse {
+    statusCode: number;
+    data: any;
+    status: (code: number) => MockResponse;
+    json: (data: any) => MockResponse;
+    setHeader: (key: string, value: string) => void;
+    send: (data: any) => void;
+}
+
+const mockReq = (body: Record<string, unknown>, user: { id: string; username: string }, companyId: string, query: Record<string, unknown> = {}): MockRequest => ({
     body,
     user,
     currentCompanyId: companyId,
     params: {},
     query
-} as any);
+});
 
-const mockRes = () => {
-    const res: any = {};
+const mockRes = (): MockResponse => {
+    const res: Partial<MockResponse> = {};
     res.statusCode = 200;
     res.data = null;
-    res.status = (code: number) => { res.statusCode = code; return res; };
-    res.json = (data: any) => { res.data = data; return res; };
+    res.status = (code: number) => { res.statusCode = code; return res as MockResponse; };
+    res.json = (data: any) => { res.data = data; return res as MockResponse; };
     res.setHeader = () => { };
     res.send = () => { };
-    return res;
+    return res as MockResponse;
 };
 
 async function runVerification() {
@@ -87,7 +105,7 @@ async function runVerification() {
         invReq.body.tipe = 'PENJUALAN';
 
         const invRes = mockRes();
-        await createTransaction(invReq, invRes);
+        await createTransaction(invReq as any, invRes as any);
 
         if (invRes.statusCode !== 201) {
             console.error('Failed to create invoice:', invRes.data);
@@ -101,7 +119,7 @@ async function runVerification() {
         console.log('\n[STEP 2] Checking Aging Schedule...');
         const agingReport = await ReportingService.calculateARAging(COMPANY_ID);
         // Find our customer
-        const customerAging = agingReport.find((d: any) => d.pelangganId === customer.id);
+        const customerAging = agingReport.find((d: { pelangganId: string }) => d.pelangganId === customer.id);
         if (customerAging) {
             console.log('Aging Bucket for Customer:', customerAging);
             // Expect some amount in 1-30 or current depending on calculation
@@ -113,7 +131,7 @@ async function runVerification() {
         console.log('\n[STEP 3] Triggering Reminders...');
         const reminders = await ReminderService.processReminders();
         // Check if our invoice is in the list
-        const reminderSent = reminders.find((r: any) => r.nomorInvoice === invoice.nomorTransaksi);
+        const reminderSent = reminders.find((r: { nomorInvoice: string; type: string }) => r.nomorInvoice === invoice.nomorTransaksi);
         if (reminderSent) {
             console.log(`[SUCCESS] Reminder generated for ${invoice.nomorTransaksi} (${reminderSent.type})`);
         } else {
@@ -134,7 +152,7 @@ async function runVerification() {
         }, USER, COMPANY_ID);
 
         const payRes = mockRes();
-        await receivePayment(payReq, payRes);
+        await receivePayment(payReq as any, payRes as any);
 
         if (payRes.statusCode !== 201) {
             console.error('Payment Failed:', payRes.data);

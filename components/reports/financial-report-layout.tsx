@@ -3,10 +3,11 @@
 import React, { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Printer, Download, FileJson } from 'lucide-react';
+import { Printer, FileJson } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+
+import { useCompany } from '@/hooks/use-company';
 
 interface FinancialReportLayoutProps {
     title: string;
@@ -14,18 +15,22 @@ interface FinancialReportLayoutProps {
     companyName?: string;
     companyAddress?: string;
     children: React.ReactNode;
-    type: 'Balance Sheet' | 'Income Statement' | 'Cash Flow';
+    type: 'Balance Sheet' | 'Income Statement' | 'Cash Flow' | 'Trial Balance' | 'General Ledger' | 'Journal';
 }
 
 export function FinancialReportLayout({
     title,
     period,
-    companyName = "PT. MAVLANA FINTECH INDONESIA",
-    companyAddress = "Menara Standard Chartered Lt. 30, Jl. Prof. Dr. Satrio No. 164, Jakarta Selatan",
+    companyName,
+    companyAddress,
     children,
     type
 }: FinancialReportLayoutProps) {
+    const { currentCompany } = useCompany();
     const componentRef = useRef<HTMLDivElement>(null);
+
+    const displayName = companyName || currentCompany?.nama || "MGYT ERP SYSTEM";
+    const displayAddress = companyAddress || currentCompany?.alamat || "Sistem Akuntansi Terintegrasi";
 
     const handlePrint = useReactToPrint({
         contentRef: componentRef,
@@ -47,7 +52,7 @@ export function FinancialReportLayout({
             document.body.appendChild(link);
             link.click();
             link.remove();
-        } catch (error) {
+        } catch {
             toast.error('Gagal mengunduh dokumen.');
         }
     };
@@ -62,8 +67,8 @@ export function FinancialReportLayout({
             <div className="border border-slate-200 shadow-sm bg-white min-h-[800px] p-10 print:p-0 print:border-0 print:shadow-none" ref={componentRef}>
                 {/* Letterhead */}
                 <div className="mb-8 border-b-2 border-slate-800 pb-4">
-                    <h1 className="text-2xl font-bold uppercase tracking-wider text-slate-900">{companyName}</h1>
-                    <p className="text-sm text-slate-500">{companyAddress}</p>
+                    <h1 className="text-2xl font-bold uppercase tracking-wider text-slate-900">{displayName}</h1>
+                    <p className="text-sm text-slate-500">{displayAddress}</p>
                 </div>
 
                 {/* Report Header */}

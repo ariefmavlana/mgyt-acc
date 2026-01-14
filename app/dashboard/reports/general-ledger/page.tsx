@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateRangePicker } from '../../../../components/ui/date-range-picker';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Download, Search } from 'lucide-react';
+import { Loader2, ArrowLeft, Download } from 'lucide-react';
+import { FinancialReportLayout } from '@/components/reports/financial-report-layout';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Account {
     id: string;
@@ -44,7 +45,7 @@ export default function GeneralLedgerPage() {
             // Re-checking previous knowledge: COA endpoint returns a tree.
             // I'll assume we iterate the tree to get all accounts.
 
-            const traverse = (nodes: any[]): Account[] => {
+            const traverse = (nodes: { id: string; kodeAkun: string; namaAkun: string; children?: { id: string; kodeAkun: string; namaAkun: string; children?: any[] }[] }[]): Account[] => {
                 let list: Account[] = [];
                 for (const node of nodes) {
                     list.push({ id: node.id, kodeAkun: node.kodeAkun, namaAkun: node.namaAkun });
@@ -132,54 +133,53 @@ export default function GeneralLedgerPage() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
             ) : report ? (
-                <Card>
-                    <CardHeader>
-                        <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                                <CardTitle className="text-xl">{report.account.code} - {report.account.name}</CardTitle>
-                                <CardDescription>
-                                    Tipe: {report.account.type} | Saldo Awal: <span className="font-semibold text-slate-900">{formatCurrency(report.openingBalance)}</span>
-                                </CardDescription>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-sm text-slate-500">Saldo Akhir</div>
-                                <div className="text-2xl font-bold text-primary">{formatCurrency(report.closingBalance)}</div>
-                            </div>
+                <FinancialReportLayout
+                    title={`${report.account.code} - ${report.account.name}`}
+                    period={`Dari ${format(dateRange?.from || new Date(), 'dd/MM/yyyy')} s/d ${format(dateRange?.to || new Date(), 'dd/MM/yyyy')}`}
+                    type="General Ledger"
+                >
+                    <div className="mb-6 flex justify-between items-end border-b pb-4">
+                        <div className="text-sm text-slate-500">
+                            Tipe: <span className="font-semibold text-slate-700">{report.account.type}</span> |
+                            Saldo Awal: <span className="font-semibold text-slate-900 ml-1">{formatCurrency(report.openingBalance)}</span>
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Tanggal</TableHead>
-                                    <TableHead>Ref</TableHead>
-                                    <TableHead>Keterangan</TableHead>
-                                    <TableHead className="text-right">Debit</TableHead>
-                                    <TableHead className="text-right">Kredit</TableHead>
-                                    <TableHead className="text-right">Saldo</TableHead>
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 uppercase font-semibold">Saldo Akhir</div>
+                            <div className="text-xl font-bold text-primary">{formatCurrency(report.closingBalance)}</div>
+                        </div>
+                    </div>
+
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Tanggal</TableHead>
+                                <TableHead>Ref</TableHead>
+                                <TableHead>Keterangan</TableHead>
+                                <TableHead className="text-right">Debit</TableHead>
+                                <TableHead className="text-right">Kredit</TableHead>
+                                <TableHead className="text-right">Saldo</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow className="bg-slate-50/50 italic text-slate-500">
+                                <TableCell colSpan={5}>Saldo Awal</TableCell>
+                                <TableCell className="text-right">{formatCurrency(report.openingBalance)}</TableCell>
+                            </TableRow>
+                            {report.transactions.map((tx: { date: string; ref: string; description: string; debit: number; credit: number; balance: number }, i: number) => (
+                                <TableRow key={i}>
+                                    <TableCell>{format(new Date(tx.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell className="font-mono text-xs">{tx.ref}</TableCell>
+                                    <TableCell>{tx.description}</TableCell>
+                                    <TableCell className="text-right font-mono text-slate-600">{tx.debit > 0 ? formatCurrency(tx.debit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono text-slate-600">{tx.credit > 0 ? formatCurrency(tx.credit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono font-medium">{formatCurrency(tx.balance)}</TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow className="bg-slate-50/50 italic text-slate-500">
-                                    <TableCell colSpan={5}>Saldo Awal</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(report.openingBalance)}</TableCell>
-                                </TableRow>
-                                {report.transactions.map((tx: any, i: number) => (
-                                    <TableRow key={i}>
-                                        <TableCell>{format(new Date(tx.date), 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell className="font-mono text-xs">{tx.ref}</TableCell>
-                                        <TableCell>{tx.description}</TableCell>
-                                        <TableCell className="text-right font-mono text-slate-600">{tx.debit > 0 ? formatCurrency(tx.debit) : '-'}</TableCell>
-                                        <TableCell className="text-right font-mono text-slate-600">{tx.credit > 0 ? formatCurrency(tx.credit) : '-'}</TableCell>
-                                        <TableCell className="text-right font-mono font-medium">{formatCurrency(tx.balance)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </FinancialReportLayout>
             ) : (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-slate-500 bg-white border rounded-lg shadow-sm">
                     Silakan pilih akun untuk melihat buku besar.
                 </div>
             )}

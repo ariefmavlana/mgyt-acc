@@ -33,7 +33,10 @@ export const tenantExtension = Prisma.defineExtension((client) => {
         query: {
             $allModels: {
                 async $allOperations({ model, operation, args, query }) {
-                    if (EXCLUDED_MODELS.includes(model)) {
+                    // Normalize model name for comparison
+                    const modelName = model || '';
+
+                    if (EXCLUDED_MODELS.some(m => m.toLowerCase() === modelName.toLowerCase())) {
                         return query(args);
                     }
 
@@ -41,8 +44,6 @@ export const tenantExtension = Prisma.defineExtension((client) => {
                     const companyId = context?.companyId;
 
                     if (!companyId) {
-                        // Allow if no context (might be a background task or login flow)
-                        // In strict mode, we might want to log this.
                         return query(args);
                     }
 

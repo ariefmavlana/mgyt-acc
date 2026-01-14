@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '../validators/auth.validator';
 import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
-import { RoleEnum } from '@prisma/client';
+import { UserRole, TierPaket } from '@prisma/client';
 import { hashPassword, comparePassword } from '../utils/password';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -56,7 +56,7 @@ export const register = async (req: Request, res: Response) => {
 
                 // Try to find existing package or create default if missing (Auto-seeding logic)
                 let paketFitur = await tx.paketFitur.findFirst({
-                    where: { tier: paketTier as any }
+                    where: { tier: paketTier as TierPaket }
                 });
 
                 if (!paketFitur) {
@@ -64,7 +64,7 @@ export const register = async (req: Request, res: Response) => {
                         data: {
                             kode: `PKG-${paketTier}`,
                             nama: `Paket ${paketTier}`,
-                            tier: paketTier as any,
+                            tier: paketTier as TierPaket,
                             isAktif: true,
                             isPublik: true
                         }
@@ -110,7 +110,7 @@ export const register = async (req: Request, res: Response) => {
                 data: {
                     penggunaId: newUser.id,
                     perusahaanId: perusahaanId,
-                    roleEnum: (validatedData.role as RoleEnum) || 'ADMIN',
+                    roleEnum: (validatedData.role as UserRole) || 'ADMIN',
                     isDefault: true,
                     isAktif: true
                 },
@@ -152,8 +152,8 @@ export const register = async (req: Request, res: Response) => {
         });
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            const message = error.errors?.[0]?.message || 'Kesalahan validasi data';
-            return res.status(400).json({ message, errors: error.errors });
+            const message = error.issues[0]?.message || 'Kesalahan validasi data';
+            return res.status(400).json({ message, errors: error.issues });
         }
         console.error(error);
         res.status(500).json({ message: 'Error server saat pendaftaran' });
@@ -275,7 +275,7 @@ export const login = async (req: Request, res: Response) => {
         });
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            const message = error.errors?.[0]?.message || 'Email atau password wajib diisi';
+            const message = error.issues[0]?.message || 'Email atau password wajib diisi';
             return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat login' });
@@ -461,7 +461,7 @@ export const changePassword = async (req: Request, res: Response) => {
         res.json({ message: 'Password berhasil diubah' });
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            const message = error.errors?.[0]?.message || 'Kesalahan validasi data';
+            const message = error.issues[0]?.message || 'Kesalahan validasi data';
             return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat mengubah password' });
@@ -520,7 +520,7 @@ export const updateProfile = async (req: Request, res: Response) => {
 
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            const message = error.errors?.[0]?.message || 'Kesalahan validasi data';
+            const message = error.issues[0]?.message || 'Kesalahan validasi data';
             return res.status(400).json({ message });
         }
         res.status(500).json({ message: 'Error server saat update profil' });

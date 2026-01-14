@@ -81,7 +81,7 @@ export const RegisterForm = () => {
                                 <FormItem>
                                     <FormLabel>Nama Lengkap</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Budi Santoso" {...field} disabled={isPending} />
+                                        <Input placeholder="Arief Maulana" {...field} disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -94,7 +94,7 @@ export const RegisterForm = () => {
                                 <FormItem>
                                     <FormLabel>Username</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="budisantoso" {...field} disabled={isPending} />
+                                        <Input placeholder="ariefmavlana" {...field} disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -120,7 +120,7 @@ export const RegisterForm = () => {
                                 <FormItem className="md:col-span-2">
                                     <FormLabel>Nama Perusahaan</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="PT Maju Bersama" {...field} disabled={isPending} />
+                                        <Input placeholder="PT Medina Giacarta" {...field} disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

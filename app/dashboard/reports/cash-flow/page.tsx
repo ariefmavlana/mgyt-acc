@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DateRangePicker } from '../../../../components/ui/date-range-picker';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Download } from 'lucide-react';
+import { FinancialReportLayout } from '@/components/reports/financial-report-layout';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -63,88 +63,68 @@ export default function CashFlowPage() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
             ) : (
-                <div className="grid gap-6">
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-500">Arus Kas Operasional</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className={`text-2xl font-bold ${report?.operating >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <FinancialReportLayout
+                    title="Laporan Arus Kas"
+                    period={`${report?.period?.start ? format(new Date(report.period.start), 'dd MMM yyyy') : '-'} s/d ${report?.period?.end ? format(new Date(report.period.end), 'dd MMM yyyy') : '-'}`}
+                    type="Cash Flow"
+                >
+                    <div className="grid gap-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div className="p-4 border rounded-lg bg-slate-50">
+                                <div className="text-xs font-medium text-slate-500 uppercase mb-1">Operasional</div>
+                                <div className={`text-xl font-bold ${report?.operating >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {formatCurrency(report?.operating || 0)}
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-500">Arus Kas Investasi</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className={`text-2xl font-bold ${report?.investing >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            </div>
+                            <div className="p-4 border rounded-lg bg-slate-50">
+                                <div className="text-xs font-medium text-slate-500 uppercase mb-1">Investasi</div>
+                                <div className={`text-xl font-bold ${report?.investing >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {formatCurrency(report?.investing || 0)}
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-500">Arus Kas Pendanaan</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className={`text-2xl font-bold ${report?.financing >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            </div>
+                            <div className="p-4 border rounded-lg bg-slate-50">
+                                <div className="text-xs font-medium text-slate-500 uppercase mb-1">Pendanaan</div>
+                                <div className={`text-xl font-bold ${report?.financing >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {formatCurrency(report?.financing || 0)}
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-slate-50 border-slate-200">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-900">Kenaikan Bersih Kas</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className={`text-2xl font-bold ${report?.netChange >= 0 ? 'text-primary' : 'text-red-600'}`}>
+                            </div>
+                            <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
+                                <div className="text-xs font-medium text-primary uppercase mb-1">Kenaikan Bersih</div>
+                                <div className={`text-xl font-bold ${report?.netChange >= 0 ? 'text-primary' : 'text-red-600'}`}>
                                     {formatCurrency(report?.netChange || 0)}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                            </div>
+                        </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Rincian Pergerakan</CardTitle>
-                            <CardDescription>
-                                Periode: {report?.period?.start ? format(new Date(report.period.start), 'dd MMM yyyy') : '-'} s/d {report?.period?.end ? format(new Date(report.period.end), 'dd MMM yyyy') : '-'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Kategori</TableHead>
-                                        <TableHead className="text-right">Jumlah</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow>
-                                        <TableCell className="font-medium">Aktivitas Operasional</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(report?.operating || 0)}</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-medium">Aktivitas Investasi</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(report?.investing || 0)}</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-medium">Aktivitas Pendanaan</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(report?.financing || 0)}</TableCell>
-                                    </TableRow>
-                                    <TableRow className="bg-slate-50 font-bold">
-                                        <TableCell>Total Kenaikan/Penurunan Kas</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(report?.netChange || 0)}</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Kategori</TableHead>
+                                    <TableHead className="text-right">Jumlah</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow>
+                                    <TableCell className="font-medium">Aktivitas Operasional</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(report?.operating || 0)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium">Aktivitas Investasi</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(report?.investing || 0)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium">Aktivitas Pendanaan</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(report?.financing || 0)}</TableCell>
+                                </TableRow>
+                                <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-800">
+                                    <TableCell>Total Kenaikan/Penurunan Kas</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(report?.netChange || 0)}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                </FinancialReportLayout>
             )}
         </div>
     );

@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Download } from 'lucide-react';
+import { FinancialReportLayout } from '@/components/reports/financial-report-layout';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -79,47 +79,43 @@ export default function TrialBalancePage() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
             ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Neraca Saldo (Trial Balance)</CardTitle>
-                        <CardDescription>
-                            Per Tanggal: {format(date, 'dd MMMM yyyy', { locale: id })}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[100px]">Kode</TableHead>
-                                    <TableHead>Nama Akun</TableHead>
-                                    <TableHead className="text-right">Debit</TableHead>
-                                    <TableHead className="text-right">Kredit</TableHead>
+                <FinancialReportLayout
+                    title="Neraca Saldo (Trial Balance)"
+                    period={`Per Tanggal: ${format(date, 'dd MMMM yyyy', { locale: id })}`}
+                    type="Trial Balance"
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[100px]">Kode</TableHead>
+                                <TableHead>Nama Akun</TableHead>
+                                <TableHead className="text-right">Debit</TableHead>
+                                <TableHead className="text-right">Kredit</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {report?.data?.map((item: { id: string; kode: string; nama: string; debit: number; kredit: number }) => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="font-mono">{item.kode}</TableCell>
+                                    <TableCell>{item.nama}</TableCell>
+                                    <TableCell className="text-right font-mono">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
+                                    <TableCell className="text-right font-mono">{item.kredit > 0 ? formatCurrency(item.kredit) : '-'}</TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {report?.data?.map((item: any) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-mono">{item.kode}</TableCell>
-                                        <TableCell>{item.nama}</TableCell>
-                                        <TableCell className="text-right font-mono">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</TableCell>
-                                        <TableCell className="text-right font-mono">{item.kredit > 0 ? formatCurrency(item.kredit) : '-'}</TableCell>
-                                    </TableRow>
-                                ))}
-                                <TableRow className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                                    <TableCell colSpan={2} className="text-right">TOTAL</TableCell>
-                                    <TableCell className="text-right text-primary">{formatCurrency(report?.summary?.totalDebit || 0)}</TableCell>
-                                    <TableCell className="text-right text-primary">{formatCurrency(report?.summary?.totalCredit || 0)}</TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                        {report?.summary && (
-                            <div className={`mt-4 p-4 rounded-lg flex items-center justify-between text-sm font-medium ${report.summary.isBalanced ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                <span>Status Keseimbangan:</span>
-                                <span>{report.summary.isBalanced ? 'SEIMBANG (BALANCED)' : 'TIDAK SEIMBANG'}</span>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            ))}
+                            <TableRow className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                                <TableCell colSpan={2} className="text-right">TOTAL</TableCell>
+                                <TableCell className="text-right text-primary">{formatCurrency(report?.summary?.totalDebit || 0)}</TableCell>
+                                <TableCell className="text-right text-primary">{formatCurrency(report?.summary?.totalCredit || 0)}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                    {report?.summary && (
+                        <div className={`mt-4 p-4 rounded-lg flex items-center justify-between text-sm font-medium ${report.summary.isBalanced ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                            <span>Status Keseimbangan:</span>
+                            <span>{report.summary.isBalanced ? 'SEIMBANG (BALANCED)' : 'TIDAK SEIMBANG'}</span>
+                        </div>
+                    )}
+                </FinancialReportLayout>
             )}
         </div>
     );

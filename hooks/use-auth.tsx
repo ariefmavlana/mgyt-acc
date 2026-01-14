@@ -13,6 +13,7 @@ interface User {
     role: string;
     perusahaanId: string;
     foto?: string;
+    telepon?: string;
     perusahaan?: {
         id: string;
         nama: string;

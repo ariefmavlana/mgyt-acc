@@ -16,9 +16,9 @@ import { WarehouseSettings } from '@/components/inventory/warehouse-settings';
 import { UsersTable } from '@/components/settings/users-table';
 
 export default function SettingsPage() {
-    const { user } = useRequireAuth('/login', ['SUPERADMIN', 'ADMIN']);
-    const companyId = user?.perusahaan?.id;
-    const { currentCompany: company, loading: isLoading, updateCompany: updateCompanyFn } = useCompany();
+    useRequireAuth('/login', ['SUPERADMIN', 'ADMIN']);
+    const { currentCompany: company, loading: isLoading, updateCompany: updateCompanyFn, updateSettings: updateSettingsFn } = useCompany();
+    const companyId = company?.id;
     const [isSaving, setIsSaving] = useState(false);
     const searchParams = useSearchParams();
     const defaultTab = searchParams.get('tab') || 'company';
@@ -32,6 +32,11 @@ export default function SettingsPage() {
         alamat: ''
     });
 
+    const [systemForm, setSystemForm] = useState({
+        mataUangUtama: 'IDR',
+        tahunBuku: 12
+    });
+
     useEffect(() => {
         if (company) {
             setForm({
@@ -41,6 +46,11 @@ export default function SettingsPage() {
                 email: company.email || '',
                 telepon: company.telepon || '',
                 alamat: company.alamat || ''
+            });
+
+            setSystemForm({
+                mataUangUtama: company.mataUangUtama || 'IDR',
+                tahunBuku: company.tahunBuku || 12
             });
         }
     }, [company]);
@@ -53,24 +63,25 @@ export default function SettingsPage() {
         if (!companyId) return;
         try {
             setIsSaving(true);
-
-            // Clean payload: remove empty strings to avoid Zod validation errors (e.g. min(5))
-            // and ensure we don't send invalid data formats
-            const payload: Record<string, string> = { ...form };
-
-            Object.keys(payload).forEach(key => {
-                if (payload[key] === '') {
-                    // For now, we remove the key so it doesn't update (keeps existing value)
-                    // If we need to clear (set to null), the validator needs .nullable() and we send null
-                    delete payload[key];
-                }
-            });
-
+            const payload = { ...form };
             await updateCompanyFn(companyId, payload);
             toast.success('Profil perusahaan berhasil diperbarui');
         } catch (error) {
             console.error(error);
-            toast.error('Gagal memperbarui profil perusahaan');
+            // toast.error is handled in useCompany
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSaveSystem = async () => {
+        if (!companyId) return;
+        try {
+            setIsSaving(true);
+            await updateSettingsFn(companyId, systemForm);
+            toast.success('Pengaturan sistem berhasil diperbarui');
+        } catch (error) {
+            console.error(error);
         } finally {
             setIsSaving(false);
         }
@@ -239,13 +250,33 @@ export default function SettingsPage() {
                         <CardContent className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <Label>Mata Uang Default</Label>
-                                    <Input value="IDR (Rupiah)" disabled />
+                                    <Label htmlFor="mataUangUtama">Mata Uang Default</Label>
+                                    <Input
+                                        id="mataUangUtama"
+                                        value={systemForm.mataUangUtama}
+                                        onChange={(e) => setSystemForm({ ...systemForm, mataUangUtama: e.target.value })}
+                                        placeholder="IDR"
+                                    />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Zona Waktu</Label>
-                                    <Input value="Asia/Jakarta (GMT+7)" disabled />
+                                    <Label htmlFor="tahunBuku">Periode Buku (Bulan)</Label>
+                                    <Input
+                                        id="tahunBuku"
+                                        type="number"
+                                        value={systemForm.tahunBuku}
+                                        onChange={(e) => setSystemForm({ ...systemForm, tahunBuku: parseInt(e.target.value) })}
+                                    />
                                 </div>
+                            </div>
+                            <div className="flex justify-end">
+                                <Button
+                                    type="button"
+                                    onClick={handleSaveSystem}
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}
+                                    Simpan Pengaturan
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

@@ -46,7 +46,7 @@ const employeeSchema = z.object({
     status: z.enum(['AKTIF', 'NONAKTIF', 'CUTI']),
 
     // Payroll & Tax
-    gajiPokok: z.coerce.number().min(0, 'Gaji pokok tidak boleh negatif'),
+    gajiPokok: z.number().min(0, 'Gaji pokok tidak boleh negatif'),
     statusPernikahan: z.string().min(1, 'Status pernikahan harus dipilih'), // TK/0, K/1 etc
 });
 
@@ -153,7 +153,7 @@ export function EmployeeForm({ open, onOpenChange, employee }: EmployeeFormProps
                                         <FormItem>
                                             <FormLabel>Nama Lengkap</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Budi Santoso" {...field} />
+                                                <Input placeholder="Arief Maulana" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -284,7 +284,15 @@ export function EmployeeForm({ open, onOpenChange, employee }: EmployeeFormProps
                                         <FormItem>
                                             <FormLabel>Gaji Pokok (Nominal)</FormLabel>
                                             <FormControl>
-                                                <Input type="number" placeholder="5000000" {...field} />
+                                                <Input
+                                                    type="number"
+                                                    placeholder="5000000"
+                                                    {...field}
+                                                    onChange={(e) => {
+                                                        const val = e.target.valueAsNumber;
+                                                        field.onChange(isNaN(val) ? 0 : val);
+                                                    }}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>

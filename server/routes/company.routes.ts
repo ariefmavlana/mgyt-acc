@@ -25,7 +25,7 @@ router.get('/:id', getCompany);
 router.post('/', createCompany);
 router.put('/:id', updateCompany);
 router.delete('/:id', deleteCompany);
-router.post('/:id/settings', updateSettings);
+router.put('/:id/settings', updateSettings);
 
 // User Management
 router.get('/:id/users', getCompanyUsers);
