@@ -7,8 +7,9 @@ export default defineConfig({
   schema: "prisma/schemas",
   migrations: {
     path: "prisma/migrations",
+    seed: "bun ./prisma/seed-roles.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env.DATABASE_URL,
   },
 });
