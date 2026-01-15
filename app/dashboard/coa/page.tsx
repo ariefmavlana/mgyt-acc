@@ -20,6 +20,16 @@ import {
     SheetTitle,
     SheetDescription,
 } from '@/components/ui/sheet';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+} from '@/components/ui/dropdown-menu';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -44,6 +54,7 @@ export default function COAPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState<any>(null);
     const [subParent, setSubParent] = useState<any>(null);
+    const [filterType, setFilterType] = useState<string>('ALL');
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const fetchCOA = useCallback(async () => {
@@ -168,7 +179,14 @@ export default function COAPage() {
     };
 
     const filteredData = useMemo(() => {
-        if (!search) return data;
+        let result = data;
+
+        // Apply type filter first if not 'ALL'
+        if (filterType !== 'ALL') {
+            result = data.filter(node => node.tipe === filterType);
+        }
+
+        if (!search) return result;
 
         const filterNodes = (nodes: COANode[]): COANode[] => {
             return nodes
@@ -186,8 +204,8 @@ export default function COAPage() {
                 });
         };
 
-        return filterNodes(data);
-    }, [data, search]);
+        return filterNodes(result);
+    }, [data, search, filterType]);
 
     // Flatten for parent selection
     const flattenNodes = (nodes: any[]): any[] => {
@@ -222,7 +240,7 @@ export default function COAPage() {
                     <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
                         <Download className="h-4 w-4" /> Export
                     </Button>
-                    <Button onClick={handleCreate} className="btn-primary gap-2">
+                    <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-[0.98] gap-2">
                         <Plus className="h-4 w-4" /> Akun Baru
                     </Button>
                 </div>
@@ -242,9 +260,31 @@ export default function COAPage() {
                     <Button variant="secondary" size="icon" onClick={fetchCOA} disabled={loading}>
                         <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
                     </Button>
-                    <Button variant="outline" className="gap-2">
-                        <Filter className="h-4 w-4" /> Filter
-                    </Button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant={filterType !== 'ALL' ? "default" : "outline"}
+                                className="gap-2"
+                                disabled={data.length === 0}
+                            >
+                                <Filter className="h-4 w-4" />
+                                {filterType === 'ALL' ? 'Filter' : filterType}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Tipe Akun</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuRadioGroup value={filterType} onValueChange={setFilterType}>
+                                <DropdownMenuRadioItem value="ALL">Semua Tipe</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="ASET">ASET</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="LIABILITAS">LIABILITAS</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="EKUITAS">EKUITAS</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="PENDAPATAN">PENDAPATAN</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="BEBAN">BEBAN</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 
@@ -259,6 +299,7 @@ export default function COAPage() {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onCreateSub={handleCreateSub}
+                    isFiltered={search !== '' || filterType !== 'ALL'}
                 />
             )}
 

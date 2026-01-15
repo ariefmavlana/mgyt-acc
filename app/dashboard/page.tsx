@@ -3,8 +3,9 @@
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useDashboard } from '@/hooks/use-dashboard';
+import { useCompany } from '@/hooks/use-company';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, DollarSign, Activity, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Loader2, Plus, ArrowRightLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
@@ -12,9 +13,10 @@ import { HelpIndicator } from '@/components/ui/help-indicator';
 
 export default function DashboardPage() {
     const { user, loading: authLoading } = useRequireAuth();
+    const { currentCompany: company, loading: companyLoading } = useCompany();
     const { data: stats, isLoading: statsLoading } = useDashboard();
 
-    if (authLoading || statsLoading) return (
+    if (authLoading || statsLoading || companyLoading) return (
         <div className="flex items-center justify-center min-h-screen">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -29,7 +31,7 @@ export default function DashboardPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
                     <p className="text-slate-500 mt-1">
-                        Ringkasan keuangan {user?.perusahaan?.nama} per {format(new Date(), 'dd MMMM yyyy', { locale: id })}
+                        Ringkasan keuangan {company?.nama} per {format(new Date(), 'dd MMMM yyyy', { locale: id })}
                     </p>
                 </div>
             </div>
@@ -116,7 +118,10 @@ export default function DashboardPage() {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                                 <span className="text-sm font-medium text-slate-600">Perusahaan</span>
-                                <span className="font-semibold text-slate-900">{user?.perusahaan?.nama}</span>
+                                <div className="text-right">
+                                    <div className="font-semibold text-slate-900">{company?.nama}</div>
+                                    <div className="text-[10px] text-primary font-bold uppercase">{company?.tier} Plan</div>
+                                </div>
                             </div>
 
                             {/* Active Users Section with Breakdown */}
@@ -143,6 +148,11 @@ export default function DashboardPage() {
                                 <span className="text-sm font-medium text-slate-600">Saldo Kas</span>
                                 <span className="font-semibold text-slate-900">{formatCurrency(stats?.cashBalance || 0)}</span>
                             </div>
+
+                            <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border-l-4 border-primary">
+                                <span className="text-sm font-medium text-slate-600">Periode Aktif</span>
+                                <span className="font-bold text-primary italic">{stats?.activePeriod?.nama || 'Tidak Ada'}</span>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -153,16 +163,16 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4">
                         <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/transactions/new'}>
-                            + Transaksi Baru
-                        </Button>
-                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/inventory/transfer'}>
-                            + Transfer Stok
-                        </Button>
-                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/inventory/opname'}>
-                            + Stock Opname
+                            <Plus className="mr-2 h-4 w-4" /> Tambah Kas
                         </Button>
                         <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/employees'}>
-                            + Karyawan
+                            <Plus className="mr-2 h-4 w-4" /> Tambah Karyawan
+                        </Button>
+                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/hr/departments'}>
+                            <Plus className="mr-2 h-4 w-4" /> Tambah Departemen
+                        </Button>
+                        <Button variant="secondary" className="w-full justify-start" onClick={() => window.location.href = '/dashboard/inventory/transfer'}>
+                            <ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer Stok
                         </Button>
                     </CardContent>
                 </Card>

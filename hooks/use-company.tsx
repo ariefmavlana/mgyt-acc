@@ -17,6 +17,7 @@ interface Company {
     logoUrl: string | null;
     tier: string;
     mataUangUtama: string;
+    tahunBuku: number;
 }
 
 interface CompanyContextType {
@@ -27,7 +28,7 @@ interface CompanyContextType {
     switchCompany: (id: string) => Promise<void>;
     createCompany: (data: Record<string, unknown>) => Promise<unknown>;
     updateCompany: (id: string, data: Partial<Company>) => Promise<unknown>;
-    updateSettings: (id: string, data: any) => Promise<void>;
+    updateSettings: (id: string, data: Record<string, unknown>) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -108,7 +109,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     };
 
-    const updateSettings = async (id: string, data: any) => {
+    const updateSettings = async (id: string, data: Record<string, unknown>) => {
         try {
             await api.put(`/companies/${id}/settings`, data);
             toast.success('Pengaturan berhasil disimpan');

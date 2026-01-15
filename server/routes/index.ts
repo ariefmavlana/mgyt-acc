@@ -1,4 +1,3 @@
-
 import express from 'express';
 import authRoutes from './auth.routes';
 import companyRoutes from './company.routes';
@@ -19,6 +18,10 @@ import dashboardRoutes from './dashboard.routes';
 import contactRoutes from './contact.routes';
 import purchaseRoutes from './purchase.routes';
 import templateRoutes from './template.routes';
+import taxRoutes from './tax.routes';
+import budgetRoutes from './budget.routes';
+import projectRoutes from './project.routes';
+import assetRoutes from './asset.routes';
 
 const router = express.Router();
 
@@ -32,6 +35,8 @@ router.use('/coa', coaRoutes);
 router.use('/reports', reportingRoutes);
 router.use('/system/audit', auditRoutes);
 router.use('/hr', hrRoutes);
+router.use('/projects', projectRoutes);
+router.use('/assets', assetRoutes);
 router.use('/documents', documentRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/import', importRoutes);
@@ -41,5 +46,7 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/contacts', contactRoutes);
 router.use('/purchases', purchaseRoutes);
 router.use('/templates', templateRoutes);
+router.use('/tax', taxRoutes);
+router.use('/budgets', budgetRoutes);
 
 export default router;

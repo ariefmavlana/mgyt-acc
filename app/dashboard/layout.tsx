@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { CompanySelector } from '@/components/companies/company-selector';
@@ -33,9 +33,10 @@ import {
     FileSignature,
     Banknote,
     Activity,
-    HelpCircle
+    HelpCircle,
+    Percent,
+    PieChart
 } from 'lucide-react';
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -72,6 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             title: 'Persediaan',
             items: [
                 { name: 'Produk', href: '/dashboard/products', icon: Box },
+                { name: 'Gudang', href: '/dashboard/inventory/warehouses', icon: Warehouse },
                 { name: 'Stok Gudang', href: '/dashboard/inventory', icon: Package },
                 { name: 'Transfer Stok', href: '/dashboard/inventory/transfer', icon: ArrowRightLeft },
             ]
@@ -81,12 +83,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             items: [
                 { name: 'Buku Besar', href: '/dashboard/coa', icon: FolderTree },
                 { name: 'Voucher / Kas', href: '/dashboard/transactions', icon: FileText },
+                { name: 'Anggaran', href: '/dashboard/budget', icon: PieChart },
+                { name: 'Aset Tetap', href: '/dashboard/assets', icon: Box },
+                { name: 'Master Pajak', href: '/dashboard/tax', icon: Percent },
             ]
         },
         {
             title: 'SDM & Gaji',
             items: [
                 { name: 'Karyawan', href: '/dashboard/employees', icon: Users },
+                { name: 'Departemen', href: '/dashboard/hr/departments', icon: Building2 },
                 { name: 'Kontrak Kerja', href: '/dashboard/contracts', icon: FileSignature },
                 { name: 'Penggajian', href: '/dashboard/payrolls', icon: Banknote },
             ]

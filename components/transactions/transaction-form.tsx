@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountSelector } from './account-selector';
+import { TaxSelector } from '@/components/tax/tax-selector';
 import { Plus, Trash2, AlertCircle, Loader2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -37,6 +38,7 @@ const transactionSchema = z.object({
     referensi: z.string().optional(),
     items: z.array(z.object({
         akunId: z.string().min(1, 'Akun harus dipilih'),
+        pajakId: z.string().optional(),
         deskripsi: z.string().optional(),
         debit: z.number().min(0),
         kredit: z.number().min(0),
@@ -70,8 +72,8 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
             deskripsi: '',
             referensi: '',
             items: [
-                { akunId: '', deskripsi: '', debit: 0, kredit: 0 },
-                { akunId: '', deskripsi: '', debit: 0, kredit: 0 },
+                { akunId: '', pajakId: '', deskripsi: '', debit: 0, kredit: 0 },
+                { akunId: '', pajakId: '', deskripsi: '', debit: 0, kredit: 0 },
             ],
         },
     });
@@ -97,7 +99,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
             const res = await api.post('/transactions', data, {
                 params: { perusahaanId: currentCompany.id }
             });
-            toast.success(res.data.message);
+            toast.success('Transaksi berhasil disimpan');
             router.push('/dashboard/transactions');
         } catch (error: unknown) {
             const axiosError = error as { response?: { data?: { message?: string } } };
@@ -110,11 +112,12 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <Card>
-                    <CardHeader>
+                {/* ... (Header Card remains unchanged) ... */}
+                <Card className="border-slate-200/60 shadow-sm overflow-hidden">
+                    <CardHeader className="bg-slate-50/30 border-b border-slate-100/50">
                         <CardTitle className="text-xl">Header Transaksi</CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-6 bg-slate-50/50">
                         <FormField
                             control={form.control}
                             name="tanggal"
@@ -122,7 +125,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                 <FormItem>
                                     <FormLabel>Tanggal</FormLabel>
                                     <FormControl>
-                                        <Input type="date" {...field} />
+                                        <Input type="date" {...field} className="bg-white" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -140,7 +143,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                         disabled={isEditing}
                                     >
                                         <FormControl>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="bg-white">
                                                 <SelectValue placeholder="Pilih tipe" />
                                             </SelectTrigger>
                                         </FormControl>
@@ -163,7 +166,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                 <FormItem>
                                     <FormLabel>No. Referensi (Opsional)</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Contoh: INV/2026/001" {...field} />
+                                        <Input placeholder="Contoh: INV/2026/001" {...field} className="bg-white" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -176,7 +179,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                 <FormItem>
                                     <FormLabel>Deskripsi Utama</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Keterangan transaksi..." {...field} />
+                                        <Input placeholder="Keterangan transaksi..." {...field} className="bg-white" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -185,22 +188,24 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
+                <Card className="border-slate-200/60 shadow-sm overflow-hidden">
+                    <CardHeader className="flex flex-row items-center justify-between bg-slate-50/30 border-b border-slate-100/50 p-4">
                         <CardTitle className="text-xl">Baris Jurnal</CardTitle>
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => append({ akunId: '', deskripsi: '', debit: 0, kredit: 0 })}
+                            onClick={() => append({ akunId: '', pajakId: '', deskripsi: '', debit: 0, kredit: 0 })}
+                            className="bg-white"
                         >
                             <Plus className="mr-2 h-4 w-4" /> Tambah Baris
                         </Button>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 p-6 bg-slate-50/50">
                         <div className="hidden md:grid grid-cols-12 gap-4 px-2 text-sm font-semibold text-muted-foreground">
-                            <div className="col-span-4">Akun</div>
-                            <div className="col-span-3">Keterangan (Opsional)</div>
+                            <div className="col-span-3">Akun</div>
+                            <div className="col-span-2">Pajak</div>
+                            <div className="col-span-2">Keterangan</div>
                             <div className="col-span-2 text-right">Debit</div>
                             <div className="col-span-2 text-right">Kredit</div>
                             <div className="col-span-1"></div>
@@ -209,7 +214,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                         <div className="space-y-3">
                             {fields.map((field, index) => (
                                 <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start border-b md:border-none pb-4 md:pb-0">
-                                    <div className="col-span-4">
+                                    <div className="col-span-3">
                                         <FormField
                                             control={form.control}
                                             name={`items.${index}.akunId`}
@@ -226,14 +231,31 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                             )}
                                         />
                                     </div>
-                                    <div className="col-span-3">
+                                    <div className="col-span-2">
+                                        <FormField
+                                            control={form.control}
+                                            name={`items.${index}.pajakId`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <TaxSelector
+                                                            value={field.value}
+                                                            onChange={field.onChange}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
                                         <FormField
                                             control={form.control}
                                             name={`items.${index}.deskripsi`}
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Input placeholder="Detail baris..." {...field} />
+                                                        <Input placeholder="..." {...field} className="bg-white" />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -249,7 +271,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                                     <FormControl>
                                                         <Input
                                                             type="number"
-                                                            className="text-right"
+                                                            className="text-right bg-white"
                                                             onChange={e => field.onChange(Number(e.target.value))}
                                                             value={field.value}
                                                         />
@@ -268,7 +290,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                                                     <FormControl>
                                                         <Input
                                                             type="number"
-                                                            className="text-right"
+                                                            className="text-right bg-white"
                                                             onChange={e => field.onChange(Number(e.target.value))}
                                                             value={field.value}
                                                         />

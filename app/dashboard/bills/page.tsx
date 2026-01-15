@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Receipt, Plus, Search, Filter, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { usePurchases } from '@/hooks/use-purchases';
@@ -27,9 +28,11 @@ export default function BillsPage() {
                     <p className="text-slate-500 mt-1">Kelola hutang usaha dan tagihan dari pemasok (Vendor Bills).</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-                        <Plus className="mr-2 h-4 w-4" /> Buat Tagihan Baru
-                    </Button>
+                    <Link href="/dashboard/bills/new">
+                        <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+                            <Plus className="mr-2 h-4 w-4" /> Buat Tagihan Baru
+                        </Button>
+                    </Link>
                 </div>
             </div>
 

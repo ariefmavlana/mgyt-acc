@@ -27,6 +27,10 @@ import purchaseRoutes from './routes/purchase.routes';
 import hrRoutes from './routes/hr.routes';
 import documentRoutes from './routes/documents.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import taxRoutes from './routes/tax.routes';
+import budgetRoutes from './routes/budget.routes';
+import projectRoutes from './routes/project.routes';
+import assetRoutes from './routes/asset.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
 import { auditLog } from './middleware/audit.middleware';
 import auditRoutes from './routes/audit.routes';
@@ -137,9 +141,13 @@ nextApp.prepare().then(() => {
     app.use('/api/import', protect, tenantMiddleware, importRoutes);
     app.use('/api/purchases', protect, tenantMiddleware, purchaseRoutes);
     app.use('/api/hr', protect, tenantMiddleware, hrRoutes);
+    app.use('/api/projects', protect, tenantMiddleware, projectRoutes);
+    app.use('/api/assets', protect, tenantMiddleware, assetRoutes);
     app.use('/api/documents', protect, tenantMiddleware, documentRoutes);
     app.use('/api/dashboard', protect, tenantMiddleware, dashboardRoutes);
     app.use('/api/system/audit', protect, tenantMiddleware, auditRoutes);
+    app.use('/api/tax', protect, tenantMiddleware, taxRoutes);
+    app.use('/api/budgets', protect, tenantMiddleware, budgetRoutes);
 
     // Global Audit Log Middleware (After Auth & Tenant, apply to all modify routes)
     // We can apply it globally or specific routes. Let's apply globally after tenant for simplicity

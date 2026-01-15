@@ -4,6 +4,91 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { calculateBPJS, calculatePPh21 } from '../utils/payroll.utils';
+import ExcelJS from 'exceljs';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+
+/**
+ * Export employees to Excel
+ */
+export const exportEmployees = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { search, department, status } = req.query;
+
+        const where: Prisma.KaryawanWhereInput = {
+            perusahaanId,
+            ...(status && status !== 'ALL' ? { status: String(status) } : {}),
+            ...(department && department !== 'ALL' ? { departemen: String(department) } : {}),
+            ...(search ? {
+                OR: [
+                    { nama: { contains: String(search), mode: 'insensitive' } },
+                    { nik: { contains: String(search), mode: 'insensitive' } },
+                    { jabatan: { contains: String(search), mode: 'insensitive' } }
+                ]
+            } : {})
+        };
+
+        const employees = await prisma.karyawan.findMany({
+            where,
+            orderBy: { nama: 'asc' }
+        });
+
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Data Karyawan');
+
+        // Columns
+        sheet.columns = [
+            { header: 'NIK', key: 'nik', width: 15 },
+            { header: 'Nama Lengkap', key: 'nama', width: 30 },
+            { header: 'Jabatan', key: 'jabatan', width: 20 },
+            { header: 'Departemen', key: 'departemen', width: 20 },
+            { header: 'Status', key: 'status', width: 15 },
+            { header: 'Tanggal Masuk', key: 'tanggalMasuk', width: 20 },
+            { header: 'Gaji Pokok', key: 'gajiPokok', width: 15 },
+            { header: 'Status PTKP', key: 'statusPernikahan', width: 15 },
+            { header: 'Email', key: 'email', width: 25 },
+            { header: 'Telepon', key: 'telepon', width: 20 },
+        ];
+
+        // Styling
+        sheet.getRow(1).font = { bold: true };
+        sheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE0E0E0' }
+        };
+
+        // Add rows
+        employees.forEach(emp => {
+            sheet.addRow({
+                nik: emp.nik,
+                nama: emp.nama,
+                jabatan: emp.jabatan,
+                departemen: emp.departemen,
+                status: emp.status,
+                tanggalMasuk: emp.tanggalMasuk ? format(new Date(emp.tanggalMasuk), 'dd/MM/yyyy') : '-',
+                gajiPokok: Number(emp.gajiPokok),
+                statusPernikahan: emp.statusPernikahan || '-',
+                email: emp.email || '-',
+                telepon: emp.telepon || '-',
+            });
+        });
+
+        // Numeric format for salary
+        sheet.getColumn('gajiPokok').numFmt = '#,##0';
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=Karyawan-${format(new Date(), 'yyyyMMdd')}.xlsx`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Error exporting employees:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
 
 /**
  * Get all employees for the current company
@@ -16,12 +101,13 @@ export const getEmployees = async (req: Request, res: Response) => {
 
         const where: Prisma.KaryawanWhereInput = {
             perusahaanId,
-            ...(status ? { status: String(status) } : {}),
-            ...(department ? { departemen: String(department) } : {}),
+            ...(status && status !== 'ALL' ? { status: String(status) } : {}),
+            ...(department && department !== 'ALL' ? { departemen: String(department) } : {}),
             ...(search ? {
                 OR: [
                     { nama: { contains: String(search), mode: 'insensitive' } },
-                    { nik: { contains: String(search), mode: 'insensitive' } }
+                    { nik: { contains: String(search), mode: 'insensitive' } },
+                    { jabatan: { contains: String(search), mode: 'insensitive' } }
                 ]
             } : {})
         };
@@ -250,6 +336,143 @@ export const generatePayroll = async (req: Request, res: Response) => {
 
     } catch (error: unknown) {
         console.error('Error generating payroll:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+/**
+ * DEPARTMENTS
+ */
+
+/**
+ * Get all departments for the current company
+ */
+export const getDepartments = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+
+        const departments = await prisma.departemen.findMany({
+            where: { perusahaanId },
+            orderBy: { nama: 'asc' }
+        });
+
+        res.json({
+            success: true,
+            data: departments
+        });
+    } catch (error: unknown) {
+        console.error('Error fetching departments:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+/**
+ * Create a new department
+ */
+export const createDepartment = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { kode, nama, kepala, deskripsi } = req.body;
+
+        if (!kode || !nama) {
+            return res.status(400).json({ success: false, message: 'Kode dan Nama departemen diperlukan' });
+        }
+
+        const department = await prisma.departemen.create({
+            data: {
+                kode,
+                nama,
+                kepala,
+                deskripsi,
+                perusahaanId
+            }
+        });
+
+        res.status(201).json({
+            success: true,
+            data: department,
+            message: 'Departemen berhasil ditambahkan'
+        });
+    } catch (error: unknown) {
+        console.error('Error creating department:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+/**
+ * Update department details
+ */
+export const updateDepartment = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { id } = req.params;
+        const { kode, nama, kepala, deskripsi, isAktif } = req.body;
+
+        const department = await prisma.departemen.findFirst({
+            where: { id: String(id), perusahaanId }
+        });
+
+        if (!department) {
+            return res.status(404).json({ success: false, message: 'Departemen tidak ditemukan' });
+        }
+
+        const updated = await prisma.departemen.update({
+            where: { id: String(id) },
+            data: {
+                kode,
+                nama,
+                kepala,
+                deskripsi,
+                isAktif
+            }
+        });
+
+        res.json({
+            success: true,
+            data: updated,
+            message: 'Data departemen berhasil diperbarui'
+        });
+    } catch (error: unknown) {
+        console.error('Error updating department:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+/**
+ * Delete a department
+ */
+export const deleteDepartment = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { id } = req.params;
+
+        const department = await prisma.departemen.findFirst({
+            where: { id: String(id), perusahaanId }
+        });
+
+        if (!department) {
+            return res.status(404).json({ success: false, message: 'Departemen tidak ditemukan' });
+        }
+
+        // Check if there are employees in this department
+        // Note: The Karyawan model has a `departemen` string field.
+        // If we want real relational integrity, we should eventually change Karyawan.departemen to a relation.
+        // For now, we'll just allow deletion or check if any employee uses this department name.
+
+        await prisma.departemen.delete({
+            where: { id: String(id) }
+        });
+
+        res.json({
+            success: true,
+            message: 'Departemen berhasil dihapus'
+        });
+    } catch (error: unknown) {
+        console.error('Error deleting department:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 };

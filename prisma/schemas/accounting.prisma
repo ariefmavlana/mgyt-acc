@@ -54,6 +54,10 @@ model ChartOfAccounts {
     transaksiDetail TransaksiDetail[]
     budgetDetail    BudgetDetail[]
 
+    asetTetapAset      AsetTetap[] @relation("AkunAset")
+    asetTetapAkumulasi AsetTetap[] @relation("AkunAkumulasi")
+    asetTetapBeban     AsetTetap[] @relation("AkunBeban")
+
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @updatedAt
     voucherDetails   VoucherDetail[]
@@ -416,7 +420,144 @@ model PeriodeAkuntansi {
 // ASSETS MANAGEMENT
 // ============================================================================
 
-model AssetFixed {
-    id String @id @default(cuid())
-    // Placeholder for future Asset module
+model AsetTetap {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodeAset String
+    namaAset String
+    kategori String?
+
+    tanggalPerolehan DateTime
+    hargaPerolehan   Decimal  @db.Decimal(25, 2)
+    nilaiResidu      Decimal  @default(0) @db.Decimal(25, 2)
+    masaManfaat      Int // dalam tahun (umur ekonomis)
+
+    supplier   Pemasok? @relation(fields: [supplierId], references: [id])
+    supplierId String?
+
+    metodePenyusutan MetodePenyusutan @default(GARIS_LURUS)
+    status           StatusAsetTetap  @default(AKTIF)
+
+    // Relation to COA
+    akunAset   ChartOfAccounts @relation("AkunAset", fields: [akunAsetId], references: [id])
+    akunAsetId String
+
+    akunAkumulasi   ChartOfAccounts @relation("AkunAkumulasi", fields: [akunAkumulasiId], references: [id])
+    akunAkumulasiId String
+
+    akunBeban   ChartOfAccounts @relation("AkunBeban", fields: [akunBebanId], references: [id])
+    akunBebanId String
+
+    akumulasiPenyusutan Decimal @default(0) @db.Decimal(25, 2)
+    nilaiBuku           Decimal @db.Decimal(25, 2)
+
+    lokasi          String?
+    departemen      String?
+    penanggungJawab String?
+
+    nomorSeri   String?
+    merk        String?
+    model       String?
+    spesifikasi String?
+
+    tanggalPenjualan DateTime?
+    nilaiPenjualan   Decimal?  @db.Decimal(25, 2)
+
+    catatan  String?
+    fotoAset String?
+
+    penyusutan      Penyusutan[]
+    transaksiDetail TransaksiDetail[]
+    dokumen         DokumenTransaksi[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodeAset])
+    @@index([perusahaanId])
+    @@index([status])
+}
+
+model Penyusutan {
+    id     String    @id @default(cuid())
+    aset   AsetTetap @relation(fields: [asetId], references: [id], onDelete: Cascade)
+    asetId String
+
+    tanggal DateTime
+    periode String // Format: YYYY-MM
+    bulan   Int
+    tahun   Int
+
+    nilaiAwal       Decimal @db.Decimal(25, 2)
+    bebanPenyusutan Decimal @db.Decimal(25, 2)
+    akumulasi       Decimal @db.Decimal(25, 2)
+    nilaiBuku       Decimal @db.Decimal(25, 2)
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+
+    keterangan String?
+
+    createdAt DateTime @default(now())
+
+    @@unique([asetId, periode])
+    @@index([asetId])
+    @@index([tahun, bulan])
+}
+
+model AsetTidakBerwujud {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    kodeAset String
+    namaAset String
+    jenis    String
+
+    tanggalPerolehan DateTime
+    nilaiPerolehan   Decimal  @db.Decimal(25, 2)
+
+    umurManfaat Int
+    nilaiResidu Decimal @default(0) @db.Decimal(25, 2)
+
+    akumulasiAmortisasi Decimal @default(0) @db.Decimal(25, 2)
+    nilaiBuku           Decimal @db.Decimal(25, 2)
+
+    nomorHakPaten String?
+    masaBerlaku   DateTime?
+
+    catatan String?
+
+    amortisasi AmortisasiAset[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([perusahaanId, kodeAset])
+    @@index([perusahaanId, jenis])
+}
+
+model AmortisasiAset {
+    id                  String            @id @default(cuid())
+    asetTidakBerwujud   AsetTidakBerwujud @relation(fields: [asetTidakBerwujudId], references: [id])
+    asetTidakBerwujudId String
+
+    periode DateTime
+    bulan   Int
+    tahun   Int
+
+    nilaiAwal       Decimal @db.Decimal(25, 2)
+    bebanAmortisasi Decimal @db.Decimal(25, 2)
+    akumulasi       Decimal @db.Decimal(25, 2)
+    nilaiBuku       Decimal @db.Decimal(25, 2)
+
+    isPosted Boolean   @default(false)
+    postedAt DateTime?
+
+    createdAt DateTime @default(now())
+
+    @@unique([asetTidakBerwujudId, periode])
+    @@index([asetTidakBerwujudId, tahun, bulan])
 }

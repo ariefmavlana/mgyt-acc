@@ -10,6 +10,11 @@ export interface DashboardStats {
     activeUsers: number;
     usersByRole: Record<string, number>;
     cashBalance: number;
+    activePeriod: {
+        nama: string;
+        tahun: number;
+        bulan: number;
+    } | null;
 }
 
 export function useDashboard() {

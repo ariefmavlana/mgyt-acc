@@ -27,6 +27,7 @@ export const transactionLineSchema = z.object({
     kredit: z.number().min(0).default(0),
     costCenterId: z.string().optional(),
     profitCenterId: z.string().optional(),
+    pajakId: z.string().optional(),
 });
 
 export const createTransactionSchema = z.object({

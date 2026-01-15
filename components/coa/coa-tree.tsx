@@ -37,6 +37,7 @@ interface COATreeProps {
     onEdit: (account: Account) => void;
     onDelete: (id: string) => void;
     onCreateSub: (parent: Account) => void;
+    isFiltered?: boolean;
 }
 
 const AccountRow = ({
@@ -168,15 +169,26 @@ const AccountRow = ({
     );
 };
 
-export function COATree({ data, onEdit, onDelete, onCreateSub }: COATreeProps) {
+export function COATree({ data, onEdit, onDelete, onCreateSub, isFiltered = false }: COATreeProps) {
     if (!data.length) {
         return (
             <div className="flex flex-col items-center justify-center py-12 bg-white rounded-xl border border-dashed border-slate-200">
                 <div className="p-4 bg-slate-50 rounded-full mb-4">
                     <Folder className="h-8 w-8 text-slate-300" />
                 </div>
-                <h3 className="text-slate-900 font-medium">Belum ada akun</h3>
-                <p className="text-slate-500 text-sm mt-1">Silakan tambah akun untuk memulai pembukuan.</p>
+                <h3 className="text-slate-900 font-medium">
+                    {isFiltered ? 'Tidak ada akun yang sesuai' : 'Belum ada akun'}
+                </h3>
+                <p className="text-slate-500 text-sm mt-1">
+                    {isFiltered
+                        ? 'Coba ubah kata kunci pencarian atau filter Anda.'
+                        : 'Silakan tambah akun untuk memulai pembukuan.'}
+                </p>
+                {isFiltered && (
+                    <p className="text-xs text-slate-400 mt-2">
+                        Atau pastikan akun yang Anda cari sudah terdaftar.
+                    </p>
+                )}
             </div>
         );
     }

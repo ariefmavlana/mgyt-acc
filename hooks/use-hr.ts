@@ -12,6 +12,19 @@ export interface Employee {
     status: string;
     tanggalMasuk: string;
     gajiPokok: number;
+    email?: string | null;
+    telepon?: string | null;
+    alamat?: string | null;
+    statusPernikahan?: string | null;
+}
+
+export interface Department {
+    id: string;
+    kode: string;
+    nama: string;
+    kepala?: string | null;
+    deskripsi?: string | null;
+    isAktif: boolean;
 }
 
 export interface Payroll {
@@ -33,13 +46,14 @@ export function useHR() {
     const queryClient = useQueryClient();
 
     // Fetch Employees
-    const useEmployees = (filters?: { search?: string, department?: string }) => {
+    const useEmployees = (filters?: { search?: string, department?: string, status?: string }) => {
         return useQuery({
             queryKey: ['employees', filters],
             queryFn: async () => {
                 const params = new URLSearchParams();
                 if (filters?.search) params.append('search', filters.search);
                 if (filters?.department) params.append('department', filters.department);
+                if (filters?.status) params.append('status', filters.status);
 
                 const { data } = await api.get(`/hr/employees?${params.toString()}`);
                 return data.data as Employee[];
@@ -63,9 +77,20 @@ export function useHR() {
 
     // Create Employee
     const createEmployee = useMutation({
-        mutationFn: async (newEmployee: any) => {
+        mutationFn: async (newEmployee: Partial<Employee>) => {
             const { data } = await api.post('/hr/employees', newEmployee);
             return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['employees'] });
+        }
+    });
+
+    // Update Employee
+    const updateEmployee = useMutation({
+        mutationFn: async ({ id, data }: { id: string, data: Partial<Employee> }) => {
+            const res = await api.put(`/hr/employees/${id}`, data);
+            return res.data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -83,10 +108,56 @@ export function useHR() {
         }
     });
 
+    // Departments
+    const useDepartments = () => {
+        return useQuery({
+            queryKey: ['departments'],
+            queryFn: async () => {
+                const { data } = await api.get('/hr/departments');
+                return data.data as Department[];
+            }
+        });
+    };
+
+    const createDepartment = useMutation({
+        mutationFn: async (dept: Omit<Department, 'id'>) => {
+            const { data } = await api.post('/hr/departments', dept);
+            return data.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['departments'] });
+        }
+    });
+
+    const updateDepartment = useMutation({
+        mutationFn: async ({ id, data }: { id: string, data: Partial<Omit<Department, 'id'>> }) => {
+            const res = await api.put(`/hr/departments/${id}`, data);
+            return res.data.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['departments'] });
+        }
+    });
+
+    const deleteDepartment = useMutation({
+        mutationFn: async (id: string) => {
+            const res = await api.delete(`/hr/departments/${id}`);
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['departments'] });
+        }
+    });
+
     return {
         useEmployees,
         usePayrolls,
+        useDepartments,
         createEmployee,
+        updateEmployee,
+        createDepartment,
+        updateDepartment,
+        deleteDepartment,
         generatePayroll
     };
 }

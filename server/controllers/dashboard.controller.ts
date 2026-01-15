@@ -105,6 +105,15 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         });
         const cashBalance = Number(cashAgg._sum.debit || 0) - Number(cashAgg._sum.kredit || 0);
 
+        // 7. Active Period
+        const activePeriod = await prisma.periodeAkuntansi.findFirst({
+            where: {
+                perusahaanId,
+                status: 'TERBUKA'
+            },
+            orderBy: [{ tahun: 'desc' }, { bulan: 'desc' }]
+        });
+
         res.json({
             revenue,
             expense,
@@ -112,7 +121,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             pendingApprovals,
             activeUsers: activeUsersCount,
             usersByRole: roleBreakdown,
-            cashBalance
+            cashBalance,
+            activePeriod: activePeriod ? {
+                nama: activePeriod.nama,
+                tahun: activePeriod.tahun,
+                bulan: activePeriod.bulan
+            } : null
         });
 
     } catch (error: unknown) {

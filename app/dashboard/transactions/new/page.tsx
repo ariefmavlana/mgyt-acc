@@ -20,8 +20,8 @@ export default function NewTransactionPage() {
                     </Link>
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Catat Transaksi Baru</h1>
-                    <p className="text-slate-500 mt-1">Gunakan formulir di bawah ini untuk mencatat jurnal akuntansi.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Tambah Kas / Voucher</h1>
+                    <p className="text-slate-500 mt-1">Gunakan formulir di bawah ini untuk mencatat jurnal akuntansi atau kas.</p>
                 </div>
             </div>
 

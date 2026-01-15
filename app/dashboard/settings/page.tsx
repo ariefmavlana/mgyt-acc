@@ -6,13 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, Settings, Shield, Save, Loader2, Warehouse } from 'lucide-react';
+import { Building2, Users, Settings, Shield, Save, Loader2 } from 'lucide-react';
 import { useCompany } from '@/hooks/use-company';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 import { PeriodSettings } from '@/components/settings/period-settings';
-import { WarehouseSettings } from '@/components/inventory/warehouse-settings';
 import { UsersTable } from '@/components/settings/users-table';
 
 export default function SettingsPage() {
@@ -68,7 +67,6 @@ export default function SettingsPage() {
             toast.success('Profil perusahaan berhasil diperbarui');
         } catch (error) {
             console.error(error);
-            // toast.error is handled in useCompany
         } finally {
             setIsSaving(false);
         }
@@ -99,26 +97,25 @@ export default function SettingsPage() {
         <div className="p-8 space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Pengaturan</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900 font-outfit">Pengaturan</h1>
                 <p className="text-slate-500 mt-1">Kelola preferensi dan konfigurasi sistem Mgyt Accounting.</p>
             </div>
 
             {/* Tabs Interface */}
             <Tabs defaultValue={defaultTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-6 lg:w-[900px] mb-8">
+                <TabsList className="grid w-full grid-cols-5 lg:w-[750px] mb-8">
                     <TabsTrigger value="company">Profil Perusahaan</TabsTrigger>
                     <TabsTrigger value="users">Pengguna</TabsTrigger>
                     <TabsTrigger value="periods">Periode</TabsTrigger>
-                    <TabsTrigger value="warehouse" className="gap-2"><Warehouse className="h-4 w-4" /> Gudang</TabsTrigger>
                     <TabsTrigger value="security">Keamanan</TabsTrigger>
                     <TabsTrigger value="system">Sistem</TabsTrigger>
                 </TabsList>
 
                 {/* Company Profile Tab */}
                 <TabsContent value="company">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                    <Card className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-slate-50/30 border-b border-slate-100/50">
+                            <CardTitle className="flex items-center gap-2 text-xl">
                                 <Building2 className="h-5 w-5 text-primary" />
                                 Profil Perusahaan
                             </CardTitle>
@@ -126,33 +123,33 @@ export default function SettingsPage() {
                                 Informasi dasar mengenai entitas bisnis Anda yang akan tampil pada laporan dan invoice.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="nama">Nama Perusahaan</Label>
-                                    <Input id="nama" value={form.nama} onChange={handleChange} placeholder="Contoh: PT Medina Giacarta" />
+                                    <Input id="nama" value={form.nama} onChange={handleChange} placeholder="Contoh: PT Medina Giacarta" className="bg-white" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="npwp">NPWP</Label>
-                                    <Input id="npwp" value={form.npwp} onChange={handleChange} placeholder="00.000.000.0-000.000" />
+                                    <Input id="npwp" value={form.npwp} onChange={handleChange} placeholder="00.000.000.0-000.000" className="bg-white" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email">Email Resmi</Label>
-                                    <Input id="email" type="email" value={form.email} onChange={handleChange} placeholder="finance@mavlana.com" />
+                                    <Input id="email" type="email" value={form.email} onChange={handleChange} placeholder="finance@mavlana.com" className="bg-white" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="telepon">Telepon</Label>
-                                    <Input id="telepon" value={form.telepon} onChange={handleChange} placeholder="+62 21 ..." />
+                                    <Input id="telepon" value={form.telepon} onChange={handleChange} placeholder="+62 21 ..." className="bg-white" />
                                 </div>
                                 <div className="col-span-2 space-y-2">
                                     <Label htmlFor="alamat">Alamat Lengkap</Label>
-                                    <Input id="alamat" value={form.alamat} onChange={handleChange} placeholder="Jl. Sudirman No..." />
+                                    <Input id="alamat" value={form.alamat} onChange={handleChange} placeholder="Jl. Sudirman No..." className="bg-white" />
                                 </div>
                             </div>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end pt-4">
                                 <Button
                                     type="button"
-                                    className="bg-primary hover:bg-primary/90"
+                                    className="bg-primary hover:bg-primary/90 shadow-sm transition-all"
                                     onClick={() => {
                                         if (!companyId) {
                                             toast.error('Data perusahaan tidak ditemukan');
@@ -172,9 +169,9 @@ export default function SettingsPage() {
 
                 {/* Users Tab */}
                 <TabsContent value="users">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                    <Card className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-slate-50/30 border-b border-slate-100/50">
+                            <CardTitle className="flex items-center gap-2 text-xl">
                                 <Users className="h-5 w-5 text-primary" />
                                 Manajemen Pengguna
                             </CardTitle>
@@ -182,11 +179,11 @@ export default function SettingsPage() {
                                 Kelola akses dan peran pengguna dalam sistem.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="p-6">
                             {companyId ? (
                                 <UsersTable companyId={companyId} />
                             ) : (
-                                <div className="text-center py-4 text-red-500">
+                                <div className="text-center py-10 text-red-500 font-medium">
                                     Data perusahaan tidak ditemukan.
                                 </div>
                             )}
@@ -199,16 +196,11 @@ export default function SettingsPage() {
                     <PeriodSettings />
                 </TabsContent>
 
-                {/* Warehouse Tab */}
-                <TabsContent value="warehouse">
-                    <WarehouseSettings />
-                </TabsContent>
-
                 {/* Security Tab */}
                 <TabsContent value="security">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                    <Card className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-slate-50/30 border-b border-slate-100/50">
+                            <CardTitle className="flex items-center gap-2 text-xl">
                                 <Shield className="h-5 w-5 text-primary" />
                                 Keamanan & Akses
                             </CardTitle>
@@ -216,20 +208,20 @@ export default function SettingsPage() {
                                 Konfigurasi keamanan akun dan kebijakan password.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <CardContent className="p-6 space-y-4">
+                            <div className="flex items-center justify-between p-5 border border-slate-100 rounded-xl bg-slate-50/30 hover:bg-slate-50 transition-colors">
                                 <div>
-                                    <h4 className="font-medium">Two-Factor Authentication (2FA)</h4>
-                                    <p className="text-sm text-slate-500">Tambahkan lapisan keamanan ekstra.</p>
+                                    <h4 className="font-semibold text-slate-800">Two-Factor Authentication (2FA)</h4>
+                                    <p className="text-sm text-slate-500">Tambahkan lapisan keamanan ekstra dengan verifikasi tambahan.</p>
                                 </div>
-                                <Button variant="outline">Aktifkan</Button>
+                                <Button variant="outline" className="bg-white border-slate-200 shadow-sm hover:bg-slate-50 transition-all duration-200">Aktifkan</Button>
                             </div>
-                            <div className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center justify-between p-5 border border-slate-100 rounded-xl bg-slate-50/30 hover:bg-slate-50 transition-colors">
                                 <div>
-                                    <h4 className="font-medium">Log Aktivitas</h4>
-                                    <p className="text-sm text-slate-500">Lihat riwayat login dan aktivitas sensitif.</p>
+                                    <h4 className="font-semibold text-slate-800">Log Aktivitas</h4>
+                                    <p className="text-sm text-slate-500">Lihat riwayat login dan aktivitas sensitif dari seluruh pengguna.</p>
                                 </div>
-                                <Button variant="outline">Lihat Log</Button>
+                                <Button variant="outline" className="bg-white border-slate-200 shadow-sm hover:bg-slate-50 transition-all duration-200">Lihat Log</Button>
                             </div>
                         </CardContent>
                     </Card>
@@ -237,17 +229,17 @@ export default function SettingsPage() {
 
                 {/* System Tab */}
                 <TabsContent value="system">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                    <Card className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-slate-50/30 border-b border-slate-100/50">
+                            <CardTitle className="flex items-center gap-2 text-xl">
                                 <Settings className="h-5 w-5 text-primary" />
                                 Preferensi Sistem
                             </CardTitle>
                             <CardDescription>
-                                Pengaturan mata uang, bahasa, dan format tanggal.
+                                Pengaturan mata uang, periode buku, dan konfigurasi inti lainnya.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="mataUangUtama">Mata Uang Default</Label>
@@ -256,6 +248,7 @@ export default function SettingsPage() {
                                         value={systemForm.mataUangUtama}
                                         onChange={(e) => setSystemForm({ ...systemForm, mataUangUtama: e.target.value })}
                                         placeholder="IDR"
+                                        className="bg-white"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -265,13 +258,15 @@ export default function SettingsPage() {
                                         type="number"
                                         value={systemForm.tahunBuku}
                                         onChange={(e) => setSystemForm({ ...systemForm, tahunBuku: parseInt(e.target.value) })}
+                                        className="bg-white"
                                     />
                                 </div>
                             </div>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end pt-4">
                                 <Button
                                     type="button"
                                     onClick={handleSaveSystem}
+                                    className="bg-primary hover:bg-primary/90 shadow-sm transition-all"
                                     disabled={isSaving}
                                 >
                                     {isSaving ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}
