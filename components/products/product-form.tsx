@@ -11,6 +11,7 @@ import { Loader2, Plus, Trash2, Package, Tag, Layers, Settings2 } from 'lucide-r
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FileUpload } from '@/components/ui/file-upload';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -188,6 +189,27 @@ export function ProductForm() {
                                         )}
                                     />
                                 </div>
+
+                                <FormField
+                                    control={form.control}
+                                    name="fotoUtama"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Foto Utama Produk</FormLabel>
+                                            <FormControl>
+                                                <FileUpload
+                                                    endpoint="imageUploader"
+                                                    value={field.value || ''}
+                                                    onChange={field.onChange}
+                                                />
+                                            </FormControl>
+                                            <FormDescription>
+                                                Klik atau seret gambar untuk mengunggah foto produk.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
                                 <FormField
                                     control={form.control}

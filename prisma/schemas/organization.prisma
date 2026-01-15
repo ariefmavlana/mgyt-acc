@@ -198,9 +198,11 @@ model Proyek {
 }
 
 model ProyekTransaksi {
-    id       String @id @default(cuid())
-    proyek   Proyek @relation(fields: [proyekId], references: [id])
-    proyekId String
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+    proyek       Proyek     @relation(fields: [proyekId], references: [id])
+    proyekId     String
 
     transaksi   Transaksi @relation("TransaksiToProyekTransaksi", fields: [transaksiId], references: [id], onDelete: Restrict)
     transaksiId String
@@ -215,6 +217,7 @@ model ProyekTransaksi {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
+    @@index([perusahaanId])
     @@index([proyekId])
     @@index([transaksiId])
     @@index([akunId])

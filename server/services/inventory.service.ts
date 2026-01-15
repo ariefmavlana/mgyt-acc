@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma'; // fix import path
+import { NotificationService } from './notification.service';
 
 export class InventoryService {
 
@@ -215,6 +216,11 @@ export class InventoryService {
             });
 
             cogsResults[`${item.persediaanId}_${item.gudangId}`] = totalCost;
+
+            // Trigger Low Stock Check
+            this.checkLowStock(item.persediaanId, item.gudangId).catch(err =>
+                console.error('[InventoryService] Async LowStock check failed:', err)
+            );
         }
 
         return cogsResults;
@@ -256,8 +262,14 @@ export class InventoryService {
         });
 
         if (stock && Number(stock.kuantitas) <= Number(stock.persediaan.stokMinimum)) {
-            // Trigger Notification (Email/In-App)
-            // TODO: Call NotificationService
+            // Trigger Notification to Admins
+            await NotificationService.notifyAdmins(stock.persediaan.perusahaanId, {
+                title: 'Peringatan Stok Rendah',
+                message: `Stok ${stock.persediaan.namaPersediaan} di gudang hampir habis (${stock.kuantitas} ${stock.persediaan.satuan})`,
+                type: 'WARNING',
+                category: 'INVENTORY',
+                referenceId: stock.persediaanId
+            });
             console.log(`ALERT: Low Stock for ${stock.persediaan.namaPersediaan} in Warehouse ${gudangId}`);
         }
     }

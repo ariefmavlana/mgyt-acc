@@ -52,9 +52,11 @@ model Karyawan {
 }
 
 model Penggajian {
-    id         String   @id @default(cuid())
-    karyawan   Karyawan @relation(fields: [karyawanId], references: [id])
-    karyawanId String
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+    karyawan     Karyawan   @relation(fields: [karyawanId], references: [id])
+    karyawanId   String
 
     periode      String
     tanggalBayar DateTime
@@ -81,7 +83,8 @@ model Penggajian {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@unique([karyawanId, periode])
+    @@unique([perusahaanId, karyawanId, periode])
+    @@index([perusahaanId])
     @@index([periode])
 }
 

@@ -1,7 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../../lib/prisma';
 import { createBudgetSchema, updateBudgetSchema, budgetQuerySchema } from '../validators/budget.validator';
-import { Prisma } from '@prisma/client';
+import { Prisma, Budget, BudgetDetail } from '@prisma/client';
+
+interface BudgetWithDetails extends Budget {
+    detail: BudgetDetail[];
+}
 
 export const getBudgets = async (req: Request, res: Response) => {
     try {
@@ -70,7 +74,7 @@ export const createBudget = async (req: Request, res: Response) => {
 
         const validatedData = createBudgetSchema.parse(req.body);
 
-        const totalBudget = validatedData.details.reduce((sum: number, item: any) => sum + item.jumlahBudget, 0);
+        const totalBudget = validatedData.details.reduce((sum: number, item) => sum + item.jumlahBudget, 0);
 
         const budget = await prisma.budget.create({
             data: {
@@ -197,7 +201,7 @@ export const calculateBudgetRealization = async (req: Request, res: Response) =>
         const budget = await prisma.budget.findUnique({
             where: { id: id as string },
             include: { detail: true }
-        }) as any;
+        }) as BudgetWithDetails;
 
         if (!budget) return res.status(404).json({ message: 'Budget tidak ditemukan' });
 
@@ -292,9 +296,9 @@ export const getVarianceReport = async (req: Request, res: Response) => {
         });
 
         const summary = {
-            totalPlanned: budgets.reduce((sum: number, b: any) => sum + Number(b.totalBudget), 0),
-            totalActual: budgets.reduce((sum: number, b: any) => sum + Number(b.totalRealisasi), 0),
-            totalVariance: budgets.reduce((sum: number, b: any) => sum + Number(b.totalVariance), 0),
+            totalPlanned: budgets.reduce((sum: number, b) => sum + Number(b.totalBudget), 0),
+            totalActual: budgets.reduce((sum: number, b) => sum + Number(b.totalRealisasi), 0),
+            totalVariance: budgets.reduce((sum: number, b) => sum + Number(b.totalVariance), 0),
             count: budgets.length,
             budgets: budgets // List for breakdown
         };

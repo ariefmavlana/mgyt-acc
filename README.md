@@ -16,12 +16,13 @@
 - **PSAK Compliant**: Struktur Chart of Accounts (COA), Laporan Keuangan, dan Perpajakan sesuai regulasi Indonesia.
 - **Multi-Tenant & Multi-Branch**: Mendukung pengelolaan banyak perusahaan dan cabang dalam satu instalasi.
 - **Real-time Engine**: Saldo buku besar dan inventory terupdate seketika saat transaksi terjadi (Event-driven).
+- **Mavlana Gold UI**: Desain premium dengan aesthetics tingkat tinggi (Shadcn/UI, Tailwind).
 
 ---
 
 ## 🚀 Modul & Fitur
 
-Sistem ini mencakup 10 modul terintegrasi untuk operasional bisnis menyeluruh:
+Sistem ini mencakup modul-modul terintegrasi untuk operasional bisnis menyeluruh:
 
 ### 1. 🏢 Core & Organization
 - **Multi-Company Dashboard**: Kelola profil perusahaan, cabang, departemen, dan pengguna.
@@ -35,97 +36,55 @@ Sistem ini mencakup 10 modul terintegrasi untuk operasional bisnis menyeluruh:
 - **Financial Reports**: Neraca, Laba Rugi, Arus Kas, dan Neraca Saldo (Real-time).
 
 ### 3. 🛍️ Sales & Receivables (AR)
-- **Invoicing**: Pembuatan Faktur Penjualan otomatis.
-- **Payment Matching**: Pencatatan pembayaran parsial dan pelunasan piutang.
-- **Aging Analysis**: Analisis umur piutang pelanggan.
+- **Invoicing**: Pembuatan Faktur Penjualan otomatis dengan kalkulasi pajak.
+- **Payment Matching**: Pencatatan pembayaran parsial dan pelunasan piutang (Aging AR).
+- **Customer Portal**: Database pelanggan dan riwayat piutang.
 
 ### 4. 🚚 Purchasing & Payables (AP)
 - **Purchase Orders**: Manajemen pesanan pembelian ke supplier.
-- **Bill Payment**: Penjadwalan dan pelunasan hutang usaha.
+- **Bill Payment**: Penjadwalan dan pelunasan hutang usaha (Aging AP).
 - **Supplier Mgmt**: Database pemasok dan riwayat transaksi.
 
 ### 5. 📦 Inventory Management
-- **Multi-Warehouse**: Stok opname per gudang.
+- **Multi-Warehouse**: Stok opname per gudang dan pelacakan antar gudang.
 - **Stock Movement**: In/Out/Transfer dan penyesuaian stok.
 - **Valuation**: Mendukung metode FIFO/Average (Default: Average).
 
 ### 6. 🧾 Tax Compliance
 - **e-Faktur Ready**: Perhitungan PPN Keluaran/Masukan (11%).
-- **PPh 21/23**: Pemotongan pajak penghasilan otomatis pada transaksi terkait.
+- **PPh 21/23/4(2)**: Pemotongan pajak penghasilan otomatis pada payroll dan jasa.
 - **Tax Reporting**: Persiapan data untuk pelaporan SPT Masa.
 
 ### 7. 👷 HR & Payroll
-- **Employee Database**: Data karyawan, jabatan, dan status pernikahan (PTKP).
-- **Payroll Process**: Perhitungan gaji, lembur, bonus, dan potongan (BPJS/Pajak).
-- **Payslip Generation**: Slip gaji otomatis.
+- **Employee Management**: Database karyawan lengkap dengan NIK, Jabatan, dan status PTKP.
+- **Payroll Processing**: Kalkulasi gaji otomatis dengan BPJS dan PPh 21.
+- **Payslip PDF**: Download slip gaji digital premium.
 
 ### 8. 🏗️ Project & Costing
-- **Project Tracking**: Monitor profitabilitas per proyek.
-- **Budgeting**: Budget vs Actual tracking untuk kontrol biaya operasional.
+- **Project Analytics**: Monitor profitabilitas, budget, dan margin per proyek.
+- **Cost Centers**: Alokasi biaya ke pusat biaya tertentu untuk analisis departemen.
 
-### 9. 📄 Document Management
-- **Digital Archive**: Upload dan lampirkan bukti transaksi (PDF/Image).
-- **Association**: Link dokumen ke Transaksi, Aset, atau Voucher.
+### 9. 📈 Budgeting
+- **Budget Setup**: Perencanaan anggaran per akun dan per departemen.
+- **Variance Analysis**: Visualisasi Budget vs Actual secara real-time.
 
-### 10. 🛡️ System & Audit
-- **Audit Trail**: Log aktivitas user mendetail (Who, When, What Changed).
-- **Security**: Proteksi CSRF, Rate Limiting, dan Enkripsi data sensitif.
+### 10. 🛡️ Asset & Audit
+- **Fixed Assets**: Manajemen aset tetap dengan penyusutan otomatis (Garis Lurus/Saldo Menurun).
+- **Audit Trail**: Log aktivitas user mendetail (History Logs).
+- **Security**: Proteksi CSRF, Rate Limiting, dan Enkripsi data.
 
 ---
 
 ## 🛠️ Teknologi Stack
-
-Didesain untuk performa, keamanan, dan skalabilitas.
 
 | Layer | Teknologi | Deskripsi |
 | :--- | :--- | :--- |
 | **Runtime** | **Bun** | Ultra-fast JavaScript runtime & package manager. |
 | **Frontend** | **Next.js 16** | App Router, Server Actions, React 19. |
 | **Styling** | **Tailwind CSS** | Styling modern dengan Shadcn/UI (Radix). |
-| **Backend** | **Express v5** | RESTful API server yang powerful. |
+| **Backend** | **Express v5** | RESTful API server modern. |
 | **Database** | **PostgreSQL** | Relational database (via Prisma ORM 7). |
 | **Security** | **Helmet & CSRF** | Proteksi standar industri. |
-
----
-
-## 💻 Panduan Instalasi (Lokal)
-
-### Prasyarat
-- [Bun](https://bun.sh) (v1.1+)
-- PostgreSQL Database
-
-### Langkah-langkah
-
-1. **Clone Repositori**
-   ```bash
-   git clone https://github.com/mavlana/accounting-system.git
-   cd accounting-system
-   ```
-
-2. **Instal Dependensi**
-   ```bash
-   bun install
-   ```
-
-3. **Konfigurasi Environment**
-   Salin `.env.example` ke `.env` dan sesuaikan koneksi database Anda:
-   ```bash
-   cp .env.example .env
-   ```
-   *Edit `.env` isi `DATABASE_URL` dengan koneksi PostgreSQL Anda.*
-
-4. **Siapkan Database**
-   ```bash
-   bun x prisma db push
-   # Opsional: Seed data awal (Roles, COA standard)
-   bun x prisma db seed
-   ```
-
-5. **Jalankan Aplikasi**
-   ```bash
-   bun dev
-   ```
-   Akses aplikasi di [http://localhost:3000](http://localhost:3000).
 
 ---
 
@@ -134,26 +93,22 @@ Didesain untuk performa, keamanan, dan skalabilitas.
 ```
 /
 ├── app/                  # Next.js App Router (Frontend Pages)
-│   ├── dashboard/        # Halaman utama aplikasi (Protected)
-│   └── (auth)/           # Halaman Login/Register
+├── components/           # UI Components (Mavlana Gold Aesthetics)
 ├── server/               # Express Backend Logic
-│   ├── controllers/      # Logika bisnis
-│   ├── routes/           # Definisi endpoint API
-│   ├── middleware/       # Auth, Tenant, Audit middleware
-│   └── index.ts          # Entry point server
-├── prisma/               # Database Schema & Migrations
-│   └── schemas/          # Modular schema definitions
-├── components/           # Reusable UI Components
-└── lib/                  # Shared Utilities (API client, helpers)
+│   ├── controllers/      # Business logic per module
+│   ├── routes/           # API endpoints
+│   └── middleware/       # Auth, Tenant, Audit guards
+├── prisma/               # Schema & Migrations (Modular)
+└── lib/                  # Canonical clients (Prisma, Cloudinary, etc.)
 ```
 
 ---
 
-## 📄 Lisensi
-
-Hak Cipta © 2026 **Arief Maulana** & **Medina Giacarta**
-Dikembangkan untuk penggunaan internal dan komersial terbatas.
+## 📄 Dokumen Tambahan
+- 🗺️ [Database Relations Explained](./DATABASE_RELATIONS_EXPLAINED.md)
+- ❓ [Frequently Asked Questions](./FAQ.md)
+- 📖 [User Manual (Panduan Pengguna)](./USER_MANUAL.md)
 
 ---
 
-> **Catatan Pengembang**: Dokumentasi relasi database detail tersedia di file [`DATABASE_RELATIONS_EXPLAINED.md`](./DATABASE_RELATIONS_EXPLAINED.md).
+Hak Cipta © 2026 **Arief Maulana** & **Medina Giacarta**

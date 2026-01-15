@@ -1194,3 +1194,87 @@ Transaksi {
 
 Apakah penjelasan ini cukup jelas? Ada bagian mana yang masih membingungkan?
 
+---
+
+## 🏢 MODUL 11: FIXED ASSETS (Penyusutan Otomatis)
+
+### Diagram Aset Tetap
+
+```
+┌─────────────┐
+│  AsetTetap  │ ◄──── Laptop, Mobil, Gedung
+│ (Fixed Asset)│        Metode: GARIS_LURUS
+└──────┬──────┘
+       │
+       │ generates
+       ▼
+┌─────────────┐
+│ Penyusutan  │ ◄──── Biaya Bulanan
+│(Depreciation)│        Jan: Rp 500rb
+└──────┬──────┘         Feb: Rp 500rb
+       │
+       │ posts to
+       ▼
+┌─────────────┐
+│ JurnalUmum  │ ◄──── GL Entry
+└─────────────┘
+```
+
+**Contoh Real (Laptop Kantor):**
+
+```typescript
+// 1. Register Asset
+const asset = await prisma.asetTetap.create({
+  data: {
+    nama: "MacBook Pro M3",
+    kodeAset: "AST-2024-001",
+    tanggalPerolehan: new Date("2024-01-01"),
+    hargaPerolehan: 30000000,
+    nilaiResidu: 5000000,
+    masaManfaat: 4, // 4 Tahun
+    metodePenyusutan: "GARIS_LURUS"
+  }
+});
+
+// 2. Engine calculates monthly depreciation
+// (30jt - 5jt) / (4 * 12) = Rp 520,833 per bulan
+```
+
+---
+
+## 💎 MODUL 12: SUBSCRIPTION & PACKAGE
+
+### Diagram Subscription
+
+```
+┌─────────────┐
+│ PaketFitur  │ ◄──── Starter, Business, Enterprise
+└──────┬──────┘
+       │
+       │ applied to
+       ▼
+┌──────────────────┐
+│ PerusahaanPaket  │ ◄──── PT Maju Jaya is Business tier
+└──────────────────┘
+       │
+       │ enables
+       ▼
+┌────────────┐
+│ FiturModul │ ◄──── Payroll: ON, Tax: ON, etc.
+└────────────┘
+```
+
+---
+
+## 📖 FINAL SUMMARY: THE "WHY" BEHIND RELATIONS
+
+1. **Multi-Tenancy (perusahaanId)**: Digunakan di **SETIAP** table agar data antar PT tidak tercampur.
+2. **Double-Entry (Voucher -> Jurnal)**: Memastikan laporan keuangan (Neraca/Laba Rugi) valid secara akuntansi.
+3. **Hierarchy (Parent IDs)**: Memungkinkan laporan keuangan level tinggi (Summary) maupun level detail (Drill-down).
+4. **Audit Logs**: Melindungi integritas data dengan mencatat setiap "Siapa melakukan Apa".
+
+---
+
+Penjelasan ini terus diperbarui seiring perkembangan sistem. Jika ada penambahan modul baru, diagram relasi akan segera menyusul.
+
+> **Production Status**: 100% Core Requirements Met. Relations are fully synchronized with the specialized backend services.

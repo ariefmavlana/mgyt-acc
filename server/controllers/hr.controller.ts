@@ -230,9 +230,7 @@ export const getPayrolls = async (req: Request, res: Response) => {
         const { period } = req.query; // Format: YYYY-MM
 
         const where: Prisma.PenggajianWhereInput = {
-            karyawan: {
-                perusahaanId
-            },
+            perusahaanId,
             ...(period ? { periode: String(period) } : {})
         };
 
@@ -279,7 +277,7 @@ export const generatePayroll = async (req: Request, res: Response) => {
         const existingPayrolls = await prisma.penggajian.findMany({
             where: {
                 periode: period,
-                karyawan: { perusahaanId }
+                perusahaanId
             },
             select: { karyawanId: true }
         });
@@ -304,6 +302,7 @@ export const generatePayroll = async (req: Request, res: Response) => {
             const net = grossIncome - totalDeduction;
 
             payrollsToCreate.push({
+                perusahaanId,
                 karyawanId: emp.id,
                 periode: period,
                 tanggalBayar: new Date(date || new Date()),

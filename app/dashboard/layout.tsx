@@ -35,12 +35,14 @@ import {
     Activity,
     HelpCircle,
     Percent,
-    PieChart
+    PieChart,
+    RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { NotificationDropdown } from '@/components/notifications/notification-dropdown';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { loading } = useRequireAuth();
@@ -94,7 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 { name: 'Karyawan', href: '/dashboard/employees', icon: Users },
                 { name: 'Departemen', href: '/dashboard/hr/departments', icon: Building2 },
                 { name: 'Kontrak Kerja', href: '/dashboard/contracts', icon: FileSignature },
-                { name: 'Penggajian', href: '/dashboard/payrolls', icon: Banknote },
+                { name: 'Penggajian', href: '/dashboard/hr/payroll', icon: Banknote },
             ]
         },
         {
@@ -102,6 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             items: [
                 { name: 'Laporan', href: '/dashboard/reports', icon: FileText },
                 { name: 'Audit Trail', href: '/dashboard/audit', icon: Activity },
+                { name: 'Transaksi Berulang', href: '/dashboard/system/recurring', icon: RefreshCw },
                 { name: 'Pengaturan', href: '/dashboard/settings', icon: Settings },
                 { name: 'Bantuan', href: '/dashboard/help', icon: HelpCircle },
             ]
@@ -186,64 +189,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-500">
                             {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                         </Button>
-                        <div className="h-4 w-px bg-slate-200 mx-2" />
                         <CompanySelector />
                     </div>
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="relative h-14 w-auto px-2 flex items-center gap-4 hover:bg-slate-50 rounded-full">
-                                <div className="text-right hidden sm:block">
-                                    <div className="text-sm font-semibold text-slate-800">{user?.namaLengkap}</div>
-                                    <div className="text-xs text-slate-500">{user?.role}</div>
-                                </div>
-                                <div className="relative h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
-                                    {user?.foto ? (
-                                        <Image
-                                            src={user.foto}
-                                            alt={user.namaLengkap}
-                                            fill
-                                            className="object-cover"
-                                        />
-                                    ) : (
-                                        <Users className="h-5 w-5 text-slate-400" />
-                                    )}
-                                </div>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56" align="end" forceMount>
-                            <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-medium leading-none">{user?.namaLengkap}</p>
-                                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                                </div>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                                <Link href="/dashboard/profile" className="cursor-pointer flex items-center">
-                                    <Users className="mr-2 h-4 w-4" />
-                                    <span>Profil Saya</span>
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href="/dashboard/settings" className="cursor-pointer flex items-center">
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    <span>Pengaturan</span>
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-red-600 focus:text-red-600">
-                                <LogOut className="mr-2 h-4 w-4" />
-                                <span>Keluar</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center gap-2">
+                        <NotificationDropdown />
+                        <div className="h-4 w-px bg-slate-200 mx-2" />
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="relative h-14 w-auto px-2 flex items-center gap-4 hover:bg-slate-50 rounded-full">
+                                    <div className="text-right hidden sm:block">
+                                        <div className="text-sm font-semibold text-slate-800">{user?.namaLengkap}</div>
+                                        <div className="text-xs text-slate-500">{user?.role}</div>
+                                    </div>
+                                    <div className="relative h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
+                                        {user?.foto ? (
+                                            <Image
+                                                src={user.foto}
+                                                alt={user.namaLengkap}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                        ) : (
+                                            <Users className="h-5 w-5 text-slate-400" />
+                                        )}
+                                    </div>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56" align="end" forceMount>
+                                <DropdownMenuLabel className="font-normal">
+                                    <div className="flex flex-col space-y-1">
+                                        <p className="text-sm font-medium leading-none">{user?.namaLengkap}</p>
+                                        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                                    </div>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/profile" className="cursor-pointer flex items-center">
+                                        <Users className="mr-2 h-4 w-4" />
+                                        <span>Profil Saya</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/settings" className="cursor-pointer flex items-center">
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        <span>Pengaturan</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-red-600 focus:text-red-600">
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Keluar</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </header>
 
                 <main className="flex-1 min-w-0">
                     {children}
                 </main>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

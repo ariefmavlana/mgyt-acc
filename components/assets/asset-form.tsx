@@ -45,6 +45,7 @@ import {
     X,
     Loader2
 } from 'lucide-react';
+import { FileUpload } from '@/components/ui/file-upload';
 
 export function AssetForm({ initialData }: { initialData?: any }) {
     const router = useRouter();
@@ -403,7 +404,16 @@ export function AssetForm({ initialData }: { initialData?: any }) {
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel className="flex items-center gap-2"><Camera className="w-4 h-4" /> Foto Aset</FormLabel>
-                                                <FormControl><Input placeholder="URL Foto Aset" {...field} /></FormControl>
+                                                <FormControl>
+                                                    <FileUpload
+                                                        endpoint="imageUploader"
+                                                        value={field.value || ''}
+                                                        onChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Klik atau seret gambar untuk mengunggah foto aset.
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}

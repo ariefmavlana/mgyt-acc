@@ -34,6 +34,12 @@ import assetRoutes from './routes/asset.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
 import { auditLog } from './middleware/audit.middleware';
 import auditRoutes from './routes/audit.routes';
+import payrollRoutes from './routes/payroll.routes';
+import organizationRoutes from './routes/organization.routes';
+import recurringRoutes from './routes/recurring.routes';
+import notificationRoutes from './routes/notification.routes';
+import cron from 'node-cron';
+import { RecurringEngine } from './lib/recurring-engine';
 import { protect } from './middleware/auth.middleware';
 import { uploadthingHandler } from './routes/upload.routes';
 
@@ -148,6 +154,10 @@ nextApp.prepare().then(() => {
     app.use('/api/system/audit', protect, tenantMiddleware, auditRoutes);
     app.use('/api/tax', protect, tenantMiddleware, taxRoutes);
     app.use('/api/budgets', protect, tenantMiddleware, budgetRoutes);
+    app.use('/api/payroll', protect, tenantMiddleware, payrollRoutes);
+    app.use('/api/organization', protect, tenantMiddleware, organizationRoutes);
+    app.use('/api/recurring', protect, tenantMiddleware, recurringRoutes);
+    app.use('/api/notifications', protect, notificationRoutes);
 
     // Global Audit Log Middleware (After Auth & Tenant, apply to all modify routes)
     // We can apply it globally or specific routes. Let's apply globally after tenant for simplicity
@@ -189,6 +199,17 @@ nextApp.prepare().then(() => {
     app.listen(PORT, () => {
         console.log(`🚀 Unified server running on http://localhost:${PORT}`);
         console.log(`📡 API available at http://localhost:${PORT}/api`);
+
+        // Scheduling: Runs at 00:01 every day
+        cron.schedule('1 0 * * *', async () => {
+            console.log('[Cron] Running daily recurring transactions check...');
+            try {
+                const results = await RecurringEngine.processAll();
+                console.log(`[Cron] Completed with ${results.length} tasks processed.`);
+            } catch (error) {
+                console.error('[Cron] Error processing recurring transactions:', error);
+            }
+        });
     });
 }).catch((err) => {
     console.error('Error starting server:', err);

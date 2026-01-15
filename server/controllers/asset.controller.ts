@@ -15,9 +15,9 @@ export const getAssets = async (req: Request, res: Response) => {
         const assets = await prisma.asetTetap.findMany({
             where: { perusahaanId },
             include: {
-                akunAset: { select: { kodeAkun: true, namaAkun: true } },
-                akunAkumulasi: { select: { kodeAkun: true, namaAkun: true } },
-                akunBeban: { select: { kodeAkun: true, namaAkun: true } },
+                coaAset: { select: { kodeAkun: true, namaAkun: true } },
+                coaAkumulasi: { select: { kodeAkun: true, namaAkun: true } },
+                coaBeban: { select: { kodeAkun: true, namaAkun: true } },
                 _count: { select: { penyusutan: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -39,9 +39,9 @@ export const getAssetById = async (req: Request, res: Response) => {
         const asset = await prisma.asetTetap.findFirst({
             where: { id, perusahaanId },
             include: {
-                akunAset: true,
-                akunAkumulasi: true,
-                akunBeban: true,
+                coaAset: true,
+                coaAkumulasi: true,
+                coaBeban: true,
                 penyusutan: {
                     orderBy: { periode: 'desc' }
                 },
@@ -156,9 +156,36 @@ export const calculateDepreciation = async (req: Request, res: Response) => {
                 }
             });
 
+            // CREATE JOURNAL ENTRY
+            if (asset.coaBebanId && asset.coaAkumulasiId) {
+                await tx.voucher.create({
+                    data: {
+                        perusahaanId,
+                        nomorVoucher: `DEP-${asset.kodeAset}-${periodeStr}`,
+                        tanggal: date,
+                        tipe: 'MEMORIAL',
+                        deskripsi: `Penyusutan ${asset.namaAset} - ${periodeStr}`,
+                        totalDebit: bebanPenyusutan,
+                        totalKredit: bebanPenyusutan,
+                        status: 'DIPOSTING',
+                        isPosted: true,
+                        postedAt: new Date(),
+                        postedBy: authReq.user.username,
+                        dibuatOlehId: authReq.user.id,
+                        detail: {
+                            create: [
+                                { urutan: 1, akunId: asset.coaBebanId, debit: bebanPenyusutan, kredit: 0, deskripsi: 'Beban Penyusutan Aset' },
+                                { urutan: 2, akunId: asset.coaAkumulasiId, debit: 0, kredit: bebanPenyusutan, deskripsi: 'Akumulasi Penyusutan Aset' }
+                            ]
+                        }
+                    }
+                });
+            }
+
             return penyusutan;
         });
 
+        await AuditService.log(perusahaanId, authReq.user!.id, 'PROCESS', 'ASET_DEPRESIASI', id, null, { periode: periodeStr, beban: bebanPenyusutan });
         res.json(result);
     } catch (error: any) {
         console.error('Calculate depreciation error:', error);

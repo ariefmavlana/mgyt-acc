@@ -22,6 +22,10 @@ import taxRoutes from './tax.routes';
 import budgetRoutes from './budget.routes';
 import projectRoutes from './project.routes';
 import assetRoutes from './asset.routes';
+import payrollRoutes from './payroll.routes';
+import organizationRoutes from './organization.routes';
+import recurringRoutes from './recurring.routes';
+import notificationRoutes from './notification.routes';
 
 const router = express.Router();
 
@@ -48,5 +52,9 @@ router.use('/purchases', purchaseRoutes);
 router.use('/templates', templateRoutes);
 router.use('/tax', taxRoutes);
 router.use('/budgets', budgetRoutes);
+router.use('/payroll', payrollRoutes);
+router.use('/organization', organizationRoutes);
+router.use('/recurring', recurringRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

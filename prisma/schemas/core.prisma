@@ -125,6 +125,8 @@ model Perusahaan {
     dashboardWidgets     DashboardWidget[]
     perusahaanPakets     PerusahaanPaket[]
     dokumenTransaksi     DokumenTransaksi[]
+    payrolls             Penggajian[]
+    proyekTransaksis     ProyekTransaksi[]
 
     @@index([kode])
     @@index([npwp])

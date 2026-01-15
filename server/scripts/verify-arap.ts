@@ -1,10 +1,8 @@
-import { PrismaClient } from '@prisma/client';
 import { receivePayment } from './controllers/payment.controller';
 import { ReportingService } from './services/reporting.service';
 import { ReminderService } from './services/reminder.service';
 import { createTransaction } from './controllers/transaction.controller';
-
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma';
 
 // Basic Mock Interfaces
 interface MockRequest {

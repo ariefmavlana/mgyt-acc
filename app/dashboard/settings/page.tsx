@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 import { PeriodSettings } from '@/components/settings/period-settings';
 import { UsersTable } from '@/components/settings/users-table';
+import { FileUpload } from '@/components/ui/file-upload';
 
 export default function SettingsPage() {
     useRequireAuth('/login', ['SUPERADMIN', 'ADMIN']);
@@ -28,7 +29,8 @@ export default function SettingsPage() {
         npwp: '',
         email: '',
         telepon: '',
-        alamat: ''
+        alamat: '',
+        logo: ''
     });
 
     const [systemForm, setSystemForm] = useState({
@@ -44,7 +46,8 @@ export default function SettingsPage() {
                 npwp: company.npwp || '',
                 email: company.email || '',
                 telepon: company.telepon || '',
-                alamat: company.alamat || ''
+                alamat: company.alamat || '',
+                logo: company.logoUrl || ''
             });
 
             setSystemForm({
@@ -124,26 +127,37 @@ export default function SettingsPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col md:flex-row gap-8 items-start mb-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="nama">Nama Perusahaan</Label>
-                                    <Input id="nama" value={form.nama} onChange={handleChange} placeholder="Contoh: PT Medina Giacarta" className="bg-white" />
+                                    <Label>Logo Perusahaan</Label>
+                                    <FileUpload
+                                        endpoint="imageUploader"
+                                        value={form.logo || ''}
+                                        onChange={(url) => setForm({ ...form, logo: url || '' })}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Max 4MB (PNG, JPG, SVG)</p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="npwp">NPWP</Label>
-                                    <Input id="npwp" value={form.npwp} onChange={handleChange} placeholder="00.000.000.0-000.000" className="bg-white" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email Resmi</Label>
-                                    <Input id="email" type="email" value={form.email} onChange={handleChange} placeholder="finance@mavlana.com" className="bg-white" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="telepon">Telepon</Label>
-                                    <Input id="telepon" value={form.telepon} onChange={handleChange} placeholder="+62 21 ..." className="bg-white" />
-                                </div>
-                                <div className="col-span-2 space-y-2">
-                                    <Label htmlFor="alamat">Alamat Lengkap</Label>
-                                    <Input id="alamat" value={form.alamat} onChange={handleChange} placeholder="Jl. Sudirman No..." className="bg-white" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="nama">Nama Perusahaan</Label>
+                                        <Input id="nama" value={form.nama} onChange={handleChange} placeholder="Contoh: PT Medina Giacarta" className="bg-white" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="npwp">NPWP</Label>
+                                        <Input id="npwp" value={form.npwp} onChange={handleChange} placeholder="00.000.000.0-000.000" className="bg-white" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">Email Resmi</Label>
+                                        <Input id="email" type="email" value={form.email} onChange={handleChange} placeholder="finance@mavlana.com" className="bg-white" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="telepon">Telepon</Label>
+                                        <Input id="telepon" value={form.telepon} onChange={handleChange} placeholder="+62 21 ..." className="bg-white" />
+                                    </div>
+                                    <div className="col-span-2 space-y-2">
+                                        <Label htmlFor="alamat">Alamat Lengkap</Label>
+                                        <Input id="alamat" value={form.alamat} onChange={handleChange} placeholder="Jl. Sudirman No..." className="bg-white" />
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex justify-end pt-4">

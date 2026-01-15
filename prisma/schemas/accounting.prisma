@@ -54,9 +54,9 @@ model ChartOfAccounts {
     transaksiDetail TransaksiDetail[]
     budgetDetail    BudgetDetail[]
 
-    asetTetapAset      AsetTetap[] @relation("AkunAset")
-    asetTetapAkumulasi AsetTetap[] @relation("AkunAkumulasi")
-    asetTetapBeban     AsetTetap[] @relation("AkunBeban")
+    asetTetapAset      AsetTetap[] @relation("AccountAssetAset")
+    asetTetapAkumulasi AsetTetap[] @relation("AccountAssetAkumulasi")
+    asetTetapBeban     AsetTetap[] @relation("AccountAssetBeban")
 
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @updatedAt
@@ -441,13 +441,13 @@ model AsetTetap {
     status           StatusAsetTetap  @default(AKTIF)
 
     // Relation to COA
-    akunAset   ChartOfAccounts @relation("AkunAset", fields: [akunAsetId], references: [id])
+    coaAset    ChartOfAccounts @relation("AccountAssetAset", fields: [akunAsetId], references: [id])
     akunAsetId String
 
-    akunAkumulasi   ChartOfAccounts @relation("AkunAkumulasi", fields: [akunAkumulasiId], references: [id])
+    coaAkumulasi    ChartOfAccounts @relation("AccountAssetAkumulasi", fields: [akunAkumulasiId], references: [id])
     akunAkumulasiId String
 
-    akunBeban   ChartOfAccounts @relation("AkunBeban", fields: [akunBebanId], references: [id])
+    coaBeban    ChartOfAccounts @relation("AccountAssetBeban", fields: [akunBebanId], references: [id])
     akunBebanId String
 
     akumulasiPenyusutan Decimal @default(0) @db.Decimal(25, 2)

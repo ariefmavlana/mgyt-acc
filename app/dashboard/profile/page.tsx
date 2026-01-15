@@ -20,13 +20,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from 'sonner';
-import { Loader2, Save, UserCircle, Camera } from 'lucide-react';
+import { Loader2, Save, UserCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { FileUpload } from '@/components/ui/file-upload';
 
 const profileSchema = z.object({
     namaLengkap: z.string().min(3, 'Nama harus minimal 3 karakter'),
     telepon: z.string().optional(),
-    foto: z.string().url('URL foto tidak valid').optional().or(z.literal('')),
+    foto: z.string().optional().or(z.literal('')),
 });
 
 export default function ProfilePage() {
@@ -164,15 +165,16 @@ export default function ProfilePage() {
                                             name="foto"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>URL Foto Profil</FormLabel>
+                                                    <FormLabel>Foto Profil</FormLabel>
                                                     <FormControl>
-                                                        <div className="relative">
-                                                            <Camera className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                                            <Input className="pl-9" placeholder="https://..." {...field} />
-                                                        </div>
+                                                        <FileUpload
+                                                            endpoint="imageUploader"
+                                                            value={field.value || ''}
+                                                            onChange={field.onChange}
+                                                        />
                                                     </FormControl>
                                                     <FormDescription>
-                                                        Masukkan URL gambar langsung (Direct Link).
+                                                        Klik atau seret gambar untuk mengunggah foto profil Anda.
                                                     </FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
