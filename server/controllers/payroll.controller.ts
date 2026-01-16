@@ -134,8 +134,6 @@ export const processPayroll = async (req: Request, res: Response) => {
 
 export const getPayrollHistory = async (req: Request, res: Response) => {
     try {
-        const authReq = req as AuthRequest;
-        const perusahaanId = authReq.currentCompanyId!;
         const { period } = req.query;
 
         const where: Prisma.PenggajianWhereInput = {};
@@ -180,19 +178,19 @@ export const postPayrollToJournal = async (req: Request, res: Response) => {
             pph: acc.pph + Number(curr.potonganPph21),
             bpjs: acc.bpjs + Number(curr.potonganBpjs),
             netto: acc.netto + Number(curr.netto)
-        }), { gaji: 0, pph: 0, bpjs: 0, netto: 0 });
+        }), { gaji: 0, pph: 0, bpjs: 0, netto: 0 } as Record<string, number>);
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const expenseAccount = await tx.chartOfAccounts.findFirst({
-                where: { perusahaanId, kategoriBeban: 'BEBAN_GAJI_DAN_TUNJANGAN' }
-            }) || await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'BEBAN', namaAkun: { contains: 'Gaji' } } });
+                where: { perusahaanId, tipe: 'BEBAN', namaAkun: { contains: 'Gaji' } }
+            });
 
             const taxPayable = await tx.chartOfAccounts.findFirst({
                 where: { perusahaanId, kategoriLiabilitas: 'HUTANG_PAJAK' }
             }) || await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'LIABILITAS', namaAkun: { contains: 'PPh' } } });
 
             const bpjsPayable = await tx.chartOfAccounts.findFirst({
-                where: { perusahaanId, kategoriLiabilitas: 'HUTANG_JANGKA_PENDEK_LAINNYA' }
+                where: { perusahaanId, kategoriLiabilitas: 'LIABILITAS_JANGKA_PENDEK' }
             }) || await tx.chartOfAccounts.findFirst({ where: { perusahaanId, tipe: 'LIABILITAS', namaAkun: { contains: 'BPJS' } } });
 
             const cashAccount = await tx.chartOfAccounts.findFirst({
@@ -211,10 +209,10 @@ export const postPayrollToJournal = async (req: Request, res: Response) => {
                     totalDebit: totals.gaji,
                     totalKredit: totals.gaji,
                     status: 'DIPOSTING',
-                    dibuatOlehId: authReq.user.id,
+                    dibuatOlehId: authReq.user?.id || '',
                     isPosted: true,
                     postedAt: new Date(),
-                    postedBy: authReq.user.username,
+                    postedBy: authReq.user?.username || 'system',
                     detail: {
                         create: [
                             { urutan: 1, akunId: expenseAccount.id, debit: totals.gaji, kredit: 0, deskripsi: 'Beban Gaji Karyawan' },
@@ -241,7 +239,7 @@ export const postPayrollToJournal = async (req: Request, res: Response) => {
             entity: 'PAYROLL',
             entityId: period,
             details: `Posted payroll for period ${period} to journal`,
-            metadata: totals as any
+            metadata: totals
         });
 
         res.json({ message: `Payroll periode ${period} berhasil diposting ke jurnal`, data: result });
@@ -254,8 +252,6 @@ export const postPayrollToJournal = async (req: Request, res: Response) => {
 
 export const downloadSlipGaji = async (req: Request, res: Response) => {
     try {
-        const authReq = req as AuthRequest;
-        const perusahaanId = authReq.currentCompanyId!;
         const { id } = req.params;
 
         const payroll = await prisma.penggajian.findUnique({

@@ -10,6 +10,7 @@ import api from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 import {
     Form,
     FormControl,
@@ -53,7 +54,6 @@ type MovementValues = z.infer<typeof movementSchema>;
 
 interface Warehouse { id: string; nama: string; kode: string; cabang?: { nama: string } }
 interface Product { id: string; namaProduk: string; kodeProduk: string; satuan: string;[key: string]: unknown }
-
 interface Account { id: string; namaAkun: string; kodeAkun: string }
 
 export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -61,7 +61,6 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
     const [products, setProducts] = useState<Product[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
 
-    // Load initial data
     useEffect(() => {
         const loadData = async () => {
             try {
@@ -117,32 +116,33 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                         control={form.control}
                         name="tipe"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Tipe Mutasi</FormLabel>
+                                <FormLabel className="flex items-center gap-2">Tipe Mutasi <HelpIndicator message="Masuk: Stok baru/tambahan. Keluar: Pemakaian intern. Transfer: Pindah gudang. Penyesuaian: Hasil opname fisik." /></FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
-                                            <SelectValue />
+                                            <SelectValue placeholder="Pilih Tipe" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem value="MASUK">Masuk (In)</SelectItem>
-                                        <SelectItem value="KELUAR">Keluar (Out)</SelectItem>
+                                        <SelectItem value="MASUK">Stok Masuk</SelectItem>
+                                        <SelectItem value="KELUAR">Stok Keluar</SelectItem>
                                         <SelectItem value="TRANSFER">Transfer Antar Gudang</SelectItem>
-                                        <SelectItem value="ADJUSTMENT">Penyesuaian (Opname)</SelectItem>
+                                        <SelectItem value="ADJUSTMENT">Penyusutan / Penyesuaian</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                    <FormField // Date
+
+                    <FormField
                         control={form.control}
                         name="tanggal"
                         render={({ field }) => (
@@ -151,32 +151,30 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                                 <FormControl>
                                     <Input
                                         type="date"
-                                        value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                                        value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
+                                        onChange={e => field.onChange(new Date(e.target.value))}
                                     />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
                     <FormField
                         control={form.control}
                         name="gudangId"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>{watchType === 'TRANSFER' ? 'Gudang Asal' : 'Gudang'}</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Pilih Gudang" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        {warehouses.map(w => (
-                                            <SelectItem key={w.id} value={w.id}>{w.nama} ({w.cabang?.nama})</SelectItem>
+                                        {warehouses.map(wh => (
+                                            <SelectItem key={wh.id} value={wh.id}>{wh.nama}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -192,15 +190,15 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Gudang Tujuan</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Pilih Tujuan" />
+                                                <SelectValue placeholder="Pilih Gudang Tujuan" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {warehouses.map(w => (
-                                                <SelectItem key={w.id} value={w.id}>{w.nama} ({w.cabang?.nama})</SelectItem>
+                                            {warehouses.map(wh => (
+                                                <SelectItem key={wh.id} value={wh.id}>{wh.nama}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -214,12 +212,10 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                             name="akunId"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>
-                                        {watchType === 'MASUK' ? 'Akun Modal/Kas/Hutang' :
-                                            watchType === 'KELUAR' ? 'Akun Biaya/Kas/Piutang' :
-                                                'Akun Penyesuaian'}
+                                    <FormLabel className="flex items-center gap-2">
+                                        Akun Alokasi Biaya/Modal <HelpIndicator message="Akun lawan (offset) untuk menjaga keseimbangan pembukuan saat terjadi mutasi stok non-jual beli." />
                                     </FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Pilih Akun" />
@@ -238,21 +234,21 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                             )}
                         />
                     )}
-                </div>
 
-                <FormField
-                    control={form.control}
-                    name="referensi"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Referensi (No. SJ / PO / Opname)</FormLabel>
-                            <FormControl>
-                                <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                    <FormField
+                        control={form.control}
+                        name="referensi"
+                        render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                                <FormLabel>Referensi (No. SJ / PO / Opname)</FormLabel>
+                                <FormControl>
+                                    <Input {...field} placeholder="Masukkan nomor referensi..." />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <div className="space-y-2">
                     <h3 className="text-sm font-medium">Item Mutasi</h3>
@@ -264,7 +260,7 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                                 render={({ field }) => (
                                     <FormItem className="flex-1">
                                         <FormControl>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <Select onValueChange={field.onChange} value={field.value}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Pilih Produk" />
                                                 </SelectTrigger>
@@ -305,7 +301,7 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Simpan Pergerakan
                 </Button>
             </form>

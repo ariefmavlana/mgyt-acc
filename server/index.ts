@@ -38,6 +38,7 @@ import payrollRoutes from './routes/payroll.routes';
 import organizationRoutes from './routes/organization.routes';
 import recurringRoutes from './routes/recurring.routes';
 import notificationRoutes from './routes/notification.routes';
+import subscriptionRoutes from './routes/subscription.routes';
 import cron from 'node-cron';
 import { RecurringEngine } from './lib/recurring-engine';
 import { protect } from './middleware/auth.middleware';
@@ -152,6 +153,7 @@ nextApp.prepare().then(() => {
     app.use('/api/documents', protect, tenantMiddleware, documentRoutes);
     app.use('/api/dashboard', protect, tenantMiddleware, dashboardRoutes);
     app.use('/api/system/audit', protect, tenantMiddleware, auditRoutes);
+    app.use('/api/system/subscription', protect, tenantMiddleware, subscriptionRoutes);
     app.use('/api/tax', protect, tenantMiddleware, taxRoutes);
     app.use('/api/budgets', protect, tenantMiddleware, budgetRoutes);
     app.use('/api/payroll', protect, tenantMiddleware, payrollRoutes);

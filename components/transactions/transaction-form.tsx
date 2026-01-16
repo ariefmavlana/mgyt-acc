@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 import { AccountSelector } from './account-selector';
 import { TaxSelector } from '@/components/tax/tax-selector';
 import { Plus, Trash2, AlertCircle, Loader2, Save } from 'lucide-react';
@@ -98,7 +99,7 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                             name: tax.namaPajak,
                             debit: 0,
                             kredit: 0,
-                            accountName: tax.akunPajak?.namaAkun || 'Akun Pajak'
+                            accountName: (tax as any).akunPajak?.namaAkun || 'Akun Pajak'
                         };
                     }
                     if (tax.jenis === 'PPN_MASUKAN') summary[key].debit += amount;
@@ -165,7 +166,10 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
                             name="tipe"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Tipe</FormLabel>
+                                    <FormLabel className="flex items-center gap-1">
+                                        Tipe
+                                        <HelpIndicator content="Kategori transaksi. Jurnal Umum digunakan untuk penyesuaian manual, sementara Penjualan/Pembelian berkaitan dengan modul stok/AR/AP." />
+                                    </FormLabel>
                                     <Select
                                         onValueChange={field.onChange}
                                         defaultValue={field.value}
@@ -219,7 +223,10 @@ export function TransactionForm({ initialData, isEditing }: TransactionFormProps
 
                 <Card className="border-slate-200/60 shadow-sm overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between bg-slate-50/30 border-b border-slate-100/50 p-4">
-                        <CardTitle className="text-xl">Baris Jurnal</CardTitle>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            Baris Jurnal
+                            <HelpIndicator content="Setiap transaksi minimal melibatkan 2 akun (Debit & Kredit) agar seimbang." />
+                        </CardTitle>
                         <Button
                             type="button"
                             variant="outline"

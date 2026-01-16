@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, Settings, Shield, Save, Loader2 } from 'lucide-react';
+import { Building2, Users, Settings, Shield, Save, Loader2, CreditCard } from 'lucide-react';
 import { useCompany } from '@/hooks/use-company';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import { useSearchParams } from 'next/navigation';
 import { PeriodSettings } from '@/components/settings/period-settings';
 import { UsersTable } from '@/components/settings/users-table';
 import { BranchSettings } from '@/components/settings/branch-settings';
+import { SubscriptionSettings } from '@/components/settings/subscription-settings';
 import { FileUpload } from '@/components/ui/file-upload';
 import {
     Select,
@@ -22,6 +23,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Tier, TIER_LIMITS } from '@/lib/tier-config';
+import { Switch } from '@/components/ui/switch';
 
 export default function SettingsPage() {
     useRequireAuth('/login', ['SUPERADMIN', 'ADMIN']);
@@ -31,6 +34,9 @@ export default function SettingsPage() {
     const searchParams = useSearchParams();
     const defaultTab = searchParams.get('tab') || 'company';
 
+    const currentTier = (company?.tier || 'UMKM') as Tier;
+    const tierConfig = TIER_LIMITS[currentTier];
+
     const [form, setForm] = useState({
         nama: '',
         kode: '',
@@ -38,7 +44,8 @@ export default function SettingsPage() {
         email: '',
         telepon: '',
         alamat: '',
-        logo: ''
+        logo: '',
+        isPusat: true
     });
 
     const [systemForm, setSystemForm] = useState({
@@ -56,7 +63,8 @@ export default function SettingsPage() {
                 email: company.email || '',
                 telepon: company.telepon || '',
                 alamat: company.alamat || '',
-                logo: company.logoUrl || ''
+                logo: company.logoUrl || '',
+                isPusat: (company as any).isPusat ?? true
             });
 
             setSystemForm({
@@ -116,12 +124,12 @@ export default function SettingsPage() {
 
             {/* Tabs Interface */}
             <Tabs defaultValue={defaultTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 lg:w-[750px] mb-8">
+                <TabsList className="grid w-full grid-cols-6 lg:w-[900px] mb-8">
                     <TabsTrigger value="company">Profil Perusahaan</TabsTrigger>
-                    <TabsTrigger value="branches">Cabang</TabsTrigger>
+                    {tierConfig.maxBranches > 0 && <TabsTrigger value="branches">Cabang</TabsTrigger>}
                     <TabsTrigger value="users">Pengguna</TabsTrigger>
                     <TabsTrigger value="periods">Periode</TabsTrigger>
-                    <TabsTrigger value="security">Keamanan</TabsTrigger>
+                    <TabsTrigger value="subscription">Langganan</TabsTrigger>
                     <TabsTrigger value="system">Sistem</TabsTrigger>
                 </TabsList>
 
@@ -165,9 +173,20 @@ export default function SettingsPage() {
                                         <Label htmlFor="telepon">Telepon</Label>
                                         <Input id="telepon" value={form.telepon} onChange={handleChange} placeholder="+62 21 ..." className="bg-white" />
                                     </div>
-                                    <div className="col-span-2 space-y-2">
+                                    <div className="col-span-2 space-y-4">
                                         <Label htmlFor="alamat">Alamat Lengkap</Label>
                                         <Input id="alamat" value={form.alamat} onChange={handleChange} placeholder="Jl. Sudirman No..." className="bg-white" />
+                                    </div>
+                                    <div className="col-span-2 flex items-center justify-between p-4 border border-slate-100 rounded-xl bg-slate-50/50">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-base">Kantor Pusat (Head Office)</Label>
+                                            <p className="text-sm text-slate-500">Tentukan apakah entitas ini adalah pusat kendali bisnis Anda.</p>
+                                        </div>
+                                        <Switch
+                                            checked={form.isPusat}
+                                            onCheckedChange={(val) => setForm({ ...form, isPusat: val })}
+                                            disabled={currentTier === 'UMKM'} // UMKM must be Pusat
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -255,6 +274,11 @@ export default function SettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* Subscription Tab */}
+                <TabsContent value="subscription">
+                    <SubscriptionSettings />
                 </TabsContent>
 
                 {/* System Tab */}

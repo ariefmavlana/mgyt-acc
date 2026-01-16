@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/popover';
 import { useCompany } from '@/hooks/use-company';
 import { useRouter } from 'next/navigation';
+import { Tier, TIER_LIMITS } from '@/lib/tier-config';
+import { AlertCircle } from 'lucide-react';
 
 export function CompanySelector() {
     const [open, setOpen] = React.useState(false);
@@ -26,6 +28,10 @@ export function CompanySelector() {
     const router = useRouter();
 
     if (loading) return <div className="h-9 w-[200px] animate-pulse bg-muted rounded-md" />;
+
+    const currentTier = (currentCompany?.tier || 'UMKM') as Tier;
+    const maxCompanies = TIER_LIMITS[currentTier]?.maxCompanies || 1;
+    const isLimitReached = companies.length >= maxCompanies;
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -77,13 +83,29 @@ export function CompanySelector() {
                         <CommandGroup>
                             <CommandItem
                                 onSelect={() => {
+                                    if (isLimitReached) return;
                                     setOpen(false);
                                     router.push('/dashboard/companies/new');
                                 }}
-                                className="flex items-center gap-2 cursor-pointer py-2 px-3 text-primary font-medium hover:bg-primary/5 italic"
+                                disabled={isLimitReached}
+                                className={cn(
+                                    "flex items-center gap-2 cursor-pointer py-2 px-3 font-medium transition-colors italic",
+                                    isLimitReached
+                                        ? "text-slate-400 bg-slate-50 cursor-not-allowed opacity-70"
+                                        : "text-primary hover:bg-primary/5"
+                                )}
                             >
-                                <PlusCircle className="h-4 w-4" />
-                                <span>Tambah Perusahaan</span>
+                                {isLimitReached ? (
+                                    <>
+                                        <AlertCircle className="h-4 w-4" />
+                                        <span>Limit Perusahaan Tercapai</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <PlusCircle className="h-4 w-4" />
+                                        <span>Tambah Perusahaan</span>
+                                    </>
+                                )}
                             </CommandItem>
                         </CommandGroup>
                     </CommandList>
@@ -91,4 +113,9 @@ export function CompanySelector() {
             </PopoverContent>
         </Popover>
     );
+}
+
+// Helper to use cn in this component if not already available
+function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(' ');
 }

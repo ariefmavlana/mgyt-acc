@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 import { useHR, Employee } from '@/hooks/use-hr';
 import { toast } from 'sonner';
 import {
@@ -399,56 +400,41 @@ export function EmployeeForm({ open, onOpenChange, employee }: EmployeeFormProps
                                                 </FormItem>
                                             )}
                                         />
-                                        <FormField
-                                            control={form.control}
-                                            name="statusPernikahan"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="flex items-center gap-1.5 text-slate-600">
-                                                        <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                                                        Status PTKP (Pajak)
-                                                    </FormLabel>
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger className="focus:ring-primary/20">
-                                                                <SelectValue placeholder="Pilih status PTKP" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="TK/0">TK/0 (Tidak Kawin, 0 Tanggungan)</SelectItem>
-                                                            <SelectItem value="K/0">K/0 (Kawin, 0 Tanggungan)</SelectItem>
-                                                            <SelectItem value="K/1">K/1 (Kawin, 1 Tanggungan)</SelectItem>
-                                                            <SelectItem value="K/2">K/2 (Kawin, 2 Tanggungan)</SelectItem>
-                                                            <SelectItem value="K/3">K/3 (Kawin, 3 Tanggungan)</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
+                                        <SelectContent>
+                                            <SelectItem value="TK/0">TK/0 (Tidak Kawin, 0 Tanggungan)</SelectItem>
+                                            <SelectItem value="K/0">K/0 (Kawin, 0 Tanggungan)</SelectItem>
+                                            <SelectItem value="K/1">K/1 (Kawin, 1 Tanggungan)</SelectItem>
+                                            <SelectItem value="K/2">K/2 (Kawin, 2 Tanggungan)</SelectItem>
+                                            <SelectItem value="K/3">K/3 (Kawin, 3 Tanggungan)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                                             )}
                                         />
-                                    </div>
-                                </CardContent>
-                            </Card>
                         </div>
+                    </CardContent>
+                </Card>
+            </div>
 
-                        <Separator className="bg-slate-200" />
+            <Separator className="bg-slate-200" />
 
-                        <div className="flex justify-end gap-3 pb-4">
-                            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-500 hover:text-slate-700">
-                                Batal
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md shadow-primary/20"
-                                disabled={createEmployee.isPending || updateEmployee.isPending}
-                            >
-                                {(createEmployee.isPending || updateEmployee.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {employee ? 'Simpan Perubahan' : 'Tambah Karyawan'}
-                            </Button>
-                        </div>
-                    </form>
-                </Form>
-            </SheetContent>
-        </Sheet>
+            <div className="flex justify-end gap-3 pb-4">
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-500 hover:text-slate-700">
+                    Batal
+                </Button>
+                <Button
+                    type="submit"
+                    className="bg-primary hover:bg-primary/90 px-8 font-semibold shadow-md shadow-primary/20"
+                    disabled={createEmployee.isPending || updateEmployee.isPending}
+                >
+                    {(createEmployee.isPending || updateEmployee.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {employee ? 'Simpan Perubahan' : 'Tambah Karyawan'}
+                </Button>
+            </div>
+        </form>
+                </Form >
+            </SheetContent >
+        </Sheet >
     );
 }

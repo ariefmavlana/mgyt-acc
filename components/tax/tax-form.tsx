@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, Percent, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTax, MasterPajak } from '@/hooks/use-tax';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 
 const taxSchema = z.object({
     kodePajak: z.string().min(2, 'Kode pajak minimal 2 karakter'),
@@ -158,6 +159,7 @@ export function TaxForm({ open, onOpenChange, tax }: TaxFormProps) {
                                             <FormItem>
                                                 <FormLabel className="text-slate-700 font-semibold text-xs flex items-center gap-1">
                                                     Tarif (%) <Percent className="w-3 h-3" />
+                                                    <HelpIndicator content="Persentase pengali pajak (misal 11 untuk PPN). Sistem akan menghitung otomatis nominal pajak berdasarkan DPP." />
                                                 </FormLabel>
                                                 <FormControl>
                                                     <Input
@@ -193,7 +195,10 @@ export function TaxForm({ open, onOpenChange, tax }: TaxFormProps) {
                                     name="jenis"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-slate-700 font-semibold text-xs">Jenis Pajak</FormLabel>
+                                            <FormLabel className="text-slate-700 font-semibold text-xs flex items-center gap-2">
+                                                Jenis Pajak
+                                                <HelpIndicator content="Klasifikasi pajak untuk pelaporan e-Faktur atau e-Bupot. Menentukan apakah pajak ini menambah pengeluaran atau pengurang pendapatan." />
+                                            </FormLabel>
                                             <Select onValueChange={field.onChange} value={(field.value as string) || ''}>
                                                 <FormControl>
                                                     <SelectTrigger className="bg-white">
@@ -277,6 +282,6 @@ export function TaxForm({ open, onOpenChange, tax }: TaxFormProps) {
                     </form>
                 </Form>
             </SheetContent>
-        </Sheet>
+        </Sheet >
     );
 }

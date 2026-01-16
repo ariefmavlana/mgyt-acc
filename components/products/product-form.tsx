@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 import { Loader2, Plus, Trash2, Package, Tag, Layers, Settings2 } from 'lucide-react';
 
 import api from '@/lib/api';
@@ -56,11 +57,9 @@ const productFormSchema = z.object({
     deskripsiSingkat: z.string().optional(),
     fotoUtama: z.string().optional(),
 
-    // Inventory
     stokMinimum: z.number().min(0).default(0),
     stokMaksimum: z.number().min(0).optional(),
 
-    // Variants
     variants: z.array(z.object({
         namaVariant: z.string().min(1, 'Nama varian wajib'),
         sku: z.string().min(1, 'SKU varian wajib'),
@@ -106,7 +105,7 @@ export function ProductForm() {
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Katalog Produk</h2>
-                        <p className="text-muted-foreground">Tamabah produk baru ke inventaris.</p>
+                        <p className="text-muted-foreground">Tambah produk baru ke inventaris.</p>
                     </div>
                     <div className="flex gap-2">
                         <Button type="button" variant="outline" onClick={() => router.back()}>Batal</Button>
@@ -235,7 +234,7 @@ export function ProductForm() {
                                 <CardDescription>Atur harga jual, beli dan satuan unit.</CardDescription>
                             </CardHeader>
                             <CardContent className="grid gap-6">
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
                                         name="hargaJualEceran"
@@ -262,54 +261,44 @@ export function ProductForm() {
                                             </FormItem>
                                         )}
                                     />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
                                         name="satuan"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Satuan</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Pilih satuan" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="pcs">Pcs</SelectItem>
-                                                        <SelectItem value="kg">Kg</SelectItem>
-                                                        <SelectItem value="box">Box</SelectItem>
-                                                        <SelectItem value="unit">Unit</SelectItem>
-                                                        <SelectItem value="set">Set</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                <FormLabel className="flex items-center gap-2">Satuan <HelpIndicator message="Unit pengukuran terkecil untuk stok (Pcs, Box, Kg, dll)." /></FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="Pcs, Box, Kg, dll" {...field} />
+                                                </FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
+                                    <FormField
+                                        control={form.control}
+                                        name="isPPN"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                                <div className="space-y-1 leading-none">
+                                                    <FormLabel className="flex items-center gap-2">
+                                                        Barang Kena Pajak (PPN) <HelpIndicator message="Aktifkan jika harga produk ini termasuk atau akan dikenakan PPN 11% saat penjualan." />
+                                                    </FormLabel>
+                                                    <FormDescription>
+                                                        Gunakan tarif PPN standar perusahaan (11%)
+                                                    </FormDescription>
+                                                </div>
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
-
-                                <FormField
-                                    control={form.control}
-                                    name="isPPN"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                            <FormControl>
-                                                <Checkbox
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <div className="space-y-1 leading-none">
-                                                <FormLabel>
-                                                    Barang Kena Pajak (PPN)
-                                                </FormLabel>
-                                                <FormDescription>
-                                                    Centang jika produk ini dikenakan PPN.
-                                                </FormDescription>
-                                            </div>
-                                        </FormItem>
-                                    )}
-                                />
                             </CardContent>
                         </Card>
                     </TabsContent>

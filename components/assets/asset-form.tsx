@@ -43,9 +43,11 @@ import {
     Camera,
     Save,
     X,
-    Loader2
+    Loader2,
+    HelpCircle
 } from 'lucide-react';
 import { FileUpload } from '@/components/ui/file-upload';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 
 export function AssetForm({ initialData }: { initialData?: any }) {
     const router = useRouter();
@@ -191,12 +193,27 @@ export function AssetForm({ initialData }: { initialData?: any }) {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                     <FormField
                                         control={form.control}
+                                        name="tanggalPerolehan"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Tanggal Perolehan</FormLabel>
+                                                <FormControl><Input type="date" {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
                                         name="hargaPerolehan"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Harga Perolehan (IDR)</FormLabel>
+                                                <FormLabel className="flex items-center gap-2"> Harga Perolehan (IDR) <HelpIndicator message="Total biaya yang dikeluarkan untuk mendapatkan aset, termasuk biaya kirim, asuransi, dan instalasi." /></FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} onChange={e => field.onChange(Number(e.target.value))} />
+                                                    <Input
+                                                        type="number"
+                                                        {...field}
+                                                        onChange={e => field.onChange(parseFloat(e.target.value))}
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -207,22 +224,14 @@ export function AssetForm({ initialData }: { initialData?: any }) {
                                         name="nilaiResidu"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Nilai Residu (Estimasi Sisa)</FormLabel>
+                                                <FormLabel className="flex items-center gap-2"> Nilai Residu (Estimasi Sisa) <HelpIndicator message="Perkiraan nilai jual aset di akhir masa manfaatnya. Nilai ini tidak akan disusutkan." /></FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} onChange={e => field.onChange(Number(e.target.value))} />
+                                                    <Input
+                                                        type="number"
+                                                        {...field}
+                                                        onChange={e => field.onChange(parseFloat(e.target.value))}
+                                                    />
                                                 </FormControl>
-                                                <FormDescription>Nilai sisa aset di akhir masa manfaat.</FormDescription>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="tanggalPerolehan"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Tanggal Perolehan</FormLabel>
-                                                <FormControl><Input type="date" {...field} value={typeof field.value === 'string' ? field.value : ''} /></FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
@@ -232,9 +241,13 @@ export function AssetForm({ initialData }: { initialData?: any }) {
                                         name="masaManfaat"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Masa Manfaat (Tahun)</FormLabel>
+                                                <FormLabel className="flex items-center gap-2"> Masa Manfaat (Tahun) <HelpIndicator message="Jangka waktu penggunaan aset. Sistem akan menghitung biaya penyusutan setiap bulan berdasarkan angka ini." /></FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} onChange={e => field.onChange(Number(e.target.value))} />
+                                                    <Input
+                                                        type="number"
+                                                        {...field}
+                                                        onChange={e => field.onChange(parseInt(e.target.value))}
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

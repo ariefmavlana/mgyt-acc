@@ -25,13 +25,19 @@ import {
 import { Building2, Plus, Pencil, Trash2, MapPin, Phone, Mail, User, Loader2 } from 'lucide-react';
 import { useCompany, Branch } from '@/hooks/use-company';
 import { toast } from 'sonner';
+import { Tier, TIER_LIMITS } from '@/lib/tier-config';
+import { AlertCircle } from 'lucide-react';
 
 export function BranchSettings() {
-    const { useBranches, createBranch, updateBranch, deleteBranch } = useCompany();
+    const { currentCompany, useBranches, createBranch, updateBranch, deleteBranch } = useCompany();
     const { data: branches, isLoading } = useBranches();
     const [open, setOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+
+    const currentTier = (currentCompany?.tier || 'UMKM') as Tier;
+    const maxBranches = TIER_LIMITS[currentTier]?.maxBranches || 0;
+    const isLimitReached = (branches?.length || 0) >= maxBranches;
 
     const [form, setForm] = useState<Partial<Branch>>({
         kode: '',
@@ -117,10 +123,20 @@ export function BranchSettings() {
                         Kelola unit bisnis atau kantor cabang perusahaan Anda.
                     </CardDescription>
                 </div>
-                <Dialog open={open} onOpenChange={(val) => { setOpen(val); if (!val) resetForm(); }}>
+                <Dialog open={open} onOpenChange={(val) => { if (isLimitReached && !editingBranch && val) return; setOpen(val); if (!val) resetForm(); }}>
                     <DialogTrigger asChild>
-                        <Button className="bg-primary hover:bg-primary/90 shadow-sm transition-all duration-200">
-                            <Plus className="mr-2 h-4 w-4" /> Tambah Cabang
+                        <Button
+                            className={cn(
+                                "transition-all duration-200",
+                                isLimitReached && !editingBranch ? "bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100" : "bg-primary hover:bg-primary/90 shadow-sm"
+                            )}
+                            disabled={isLimitReached && !editingBranch}
+                        >
+                            {isLimitReached && !editingBranch ? (
+                                <><AlertCircle className="mr-2 h-4 w-4" /> Limit Cabang Tercapai</>
+                            ) : (
+                                <><Plus className="mr-2 h-4 w-4" /> Tambah Cabang</>
+                            )}
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[600px]">
@@ -271,4 +287,8 @@ export function BranchSettings() {
             </CardContent>
         </Card>
     );
+}
+
+function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(' ');
 }

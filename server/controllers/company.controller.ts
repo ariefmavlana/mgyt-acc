@@ -3,12 +3,13 @@ import { createCompanySchema, updateCompanySchema, settingsSchema, inviteUserSch
 import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { TierPaket } from '@prisma/client';
+import { TierPaket, Prisma, UserRole } from '@prisma/client';
 
 export const getCompanies = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
-        const userId = authReq.user.id;
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
         const page = parseInt((req.query.page as string) || '1');
         const limit = parseInt((req.query.limit as string) || '10');
         const skip = (page - 1) * limit;
@@ -40,7 +41,7 @@ export const getCompanies = async (req: Request, res: Response) => {
             })
         ]);
 
-        const companies = companiesRes.map(c => ({
+        const companies = companiesRes.map((c) => ({
             ...c,
             tier: c.perusahaanPakets[0]?.paket?.tier || 'UMKM'
         }));
@@ -64,7 +65,8 @@ export const getCompany = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { id } = req.params;
-        const userId = authReq.user.id;
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         const company = await prisma.perusahaan.findFirst({
             where: {
@@ -90,9 +92,10 @@ export const createCompany = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { tier, ...rest } = createCompanySchema.parse(req.body);
-        const userId = authReq.user.id;
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-        const company = await prisma.$transaction(async (tx) => {
+        const company = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const comp = await tx.perusahaan.create({
                 data: {
                     ...rest,
@@ -134,7 +137,7 @@ export const createCompany = async (req: Request, res: Response) => {
         res.status(201).json(company);
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            return res.status(400).json({ message: error.errors[0].message });
+            return res.status(400).json({ message: error.issues[0].message });
         }
         console.error(error);
         res.status(500).json({ message: 'Gagal membuat perusahaan' });
@@ -146,7 +149,8 @@ export const updateCompany = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
         const { id } = req.params;
         const validatedData = updateCompanySchema.parse(req.body);
-        const userId = authReq.user.id;
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         // Verify ownership
         const companyExists = await prisma.perusahaan.findFirst({
@@ -167,7 +171,7 @@ export const updateCompany = async (req: Request, res: Response) => {
         res.json(updatedCompany);
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            return res.status(400).json({ message: error.errors[0].message });
+            return res.status(400).json({ message: error.issues[0].message });
         }
         res.status(500).json({ message: 'Gagal memperbarui perusahaan' });
     }
@@ -177,7 +181,8 @@ export const deleteCompany = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { id } = req.params;
-        const userId = authReq.user.id;
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         const count = await prisma.perusahaan.count({
             where: { aksesPengguna: { some: { penggunaId: userId } } }
@@ -209,7 +214,8 @@ export const updateSettings = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
         const { id } = req.params;
         const validatedData = settingsSchema.parse(req.body);
-        const userId = authReq.user.id;
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         const company = await prisma.perusahaan.findFirst({
             where: { id: String(id), aksesPengguna: { some: { penggunaId: userId } } }
@@ -227,7 +233,7 @@ export const updateSettings = async (req: Request, res: Response) => {
         res.json(updatedCompany);
     } catch (error: unknown) {
         if (error instanceof ZodError) {
-            return res.status(400).json({ message: error.errors[0].message });
+            return res.status(400).json({ message: error.issues[0].message });
         }
         res.status(500).json({ message: 'Gagal memperbarui pengaturan' });
     }
@@ -370,11 +376,13 @@ export const getCompanyUsers = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
         const { id } = req.params;
         const perusahaanId = String(id);
+        const userId = authReq.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
         // Verify requestor has access to this company
         const requesterAccess = await prisma.aksesPengguna.findFirst({
             where: {
-                penggunaId: authReq.user.id,
+                penggunaId: userId,
                 perusahaanId: perusahaanId,
                 isAktif: true
             }
@@ -402,7 +410,7 @@ export const getCompanyUsers = async (req: Request, res: Response) => {
             }
         });
 
-        const formattedUsers = users.map(u => ({
+        const formattedUsers = users.map((u) => ({
             id: u.pengguna.id,
             nama: u.pengguna.namaLengkap,
             email: u.pengguna.email,
@@ -419,7 +427,6 @@ export const getCompanyUsers = async (req: Request, res: Response) => {
 
 export const addUserToCompany = async (req: Request, res: Response) => {
     try {
-        const authReq = req as AuthRequest;
         const { id } = req.params;
         const validatedBody = inviteUserSchema.parse(req.body);
 
@@ -447,7 +454,7 @@ export const addUserToCompany = async (req: Request, res: Response) => {
                 // Reactivate
                 await prisma.aksesPengguna.update({
                     where: { id: existingAccess.id },
-                    data: { isAktif: true, roleEnum: validatedBody.role as any }
+                    data: { isAktif: true, roleEnum: validatedBody.role as UserRole }
                 });
                 return res.json({ message: 'User berhasil diaktifkan kembali.' });
             }
@@ -458,7 +465,7 @@ export const addUserToCompany = async (req: Request, res: Response) => {
             data: {
                 penggunaId: userToAdd.id,
                 perusahaanId: String(id),
-                roleEnum: validatedBody.role as any,
+                roleEnum: validatedBody.role as UserRole,
                 isAktif: true
             }
         });
@@ -466,7 +473,7 @@ export const addUserToCompany = async (req: Request, res: Response) => {
         res.status(201).json({ message: 'User berhasil ditambahkan.' });
     } catch (error) {
         if (error instanceof ZodError) {
-            return res.status(400).json({ message: error.errors[0].message });
+            return res.status(400).json({ message: error.issues[0].message });
         }
         console.error('Add User Error:', error);
         res.status(500).json({ message: 'Gagal menambahkan user' });
@@ -477,8 +484,10 @@ export const removeUserFromCompany = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const { id, userId } = req.params;
+        const currentUserId = authReq.user?.id;
+        if (!currentUserId) return res.status(401).json({ message: 'Unauthorized' });
 
-        if (userId === authReq.user.id) {
+        if (userId === currentUserId) {
             return res.status(400).json({ message: 'Anda tidak dapat menghapus diri sendiri.' });
         }
 

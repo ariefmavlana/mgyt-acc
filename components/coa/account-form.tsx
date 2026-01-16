@@ -32,6 +32,7 @@ import { TipeAkun } from '@prisma/client';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 import { RefreshCw, LayoutGrid, Tag, Layers, Anchor, DollarSign, StickyNote, Settings, Building2, Briefcase } from 'lucide-react';
 
 type AccountFormData = z.infer<typeof createCOASchema>;
@@ -114,6 +115,7 @@ export function AccountForm({ initialData, parents, onSubmit, isLoading }: Accou
                                                     <FormLabel className="flex items-center gap-1.5">
                                                         <Tag className="w-3.5 h-3.5 text-slate-400" />
                                                         Kode Akun
+                                                        <HelpIndicator content="Nomor unik pengenal akun. Gunakan prefix yang sesuai dengan tipe akun (misal: 1xxx untuk Aset)." />
                                                     </FormLabel>
                                                     <Button
                                                         type="button"
@@ -175,6 +177,7 @@ export function AccountForm({ initialData, parents, onSubmit, isLoading }: Accou
                                             <FormLabel className="flex items-center gap-1.5">
                                                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
                                                 Tipe Akun
+                                                <HelpIndicator content="Klasifikasi akun untuk laporan keuangan. Akun Aset/Liabilitas/Ekuitas masuk ke Neraca, sedangkan Pendapatan/Beban masuk ke Laba Rugi." />
                                             </FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>

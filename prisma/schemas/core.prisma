@@ -58,6 +58,7 @@ model Perusahaan {
     nama             String
     deskripsi        String?
     onboardingStatus OnboardingStatus @default(PENDING)
+    isPusat          Boolean          @default(true)
     namaLengkap      String?
     bentukUsaha      String?
     bidangUsaha      String?

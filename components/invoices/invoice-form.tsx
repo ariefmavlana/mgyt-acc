@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 
 // Schema Validation (Frontend Mirror of Backend Validator)
 const invoiceFormSchema = z.object({
@@ -216,7 +217,10 @@ export function InvoiceForm() {
                                     name="terminPembayaran"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Termin (Hari)</FormLabel>
+                                            <FormLabel className="flex items-center gap-1">
+                                                Termin (Hari)
+                                                <HelpIndicator content="Jangka waktu pembayaran. Contoh: 30 hari untuk pembayaran 'Net 30'." />
+                                            </FormLabel>
                                             <FormControl>
                                                 <Input type="number" value={field.value} onChange={e => field.onChange(e.target.valueAsNumber)} />
                                             </FormControl>
@@ -262,7 +266,10 @@ export function InvoiceForm() {
                                             name={`items.${index}.akunId`}
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className={index !== 0 ? "sr-only" : ""}>Akun Pendapatan</FormLabel>
+                                                    <FormLabel className={cn("flex items-center gap-1", index !== 0 && "sr-only")}>
+                                                        Akun Pendapatan
+                                                        {index === 0 && <HelpIndicator content="Pilih akun kategori 'Pendapatan' dari COA Anda." />}
+                                                    </FormLabel>
                                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                         <FormControl>
                                                             <SelectTrigger>

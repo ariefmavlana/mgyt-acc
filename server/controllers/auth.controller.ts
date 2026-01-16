@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema } from '../validators/auth.validator';
 import { ZodError } from 'zod';
 import prisma from '../../lib/prisma';
-import { UserRole, TierPaket } from '@prisma/client';
+import { UserRole, TierPaket, Prisma } from '@prisma/client';
 import { hashPassword, comparePassword } from '../utils/password';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -39,7 +39,7 @@ export const register = async (req: Request, res: Response) => {
         const hashedPassword = await hashPassword(validatedData.password);
 
         // Create Company and User in a transaction
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             let perusahaanId: string;
 
             if (validatedData.namaPerusahaan) {
@@ -299,7 +299,7 @@ export const getMe = async (req: Request, res: Response) => {
 
     // Fetch full user with company list
     const user = await prisma.pengguna.findUnique({
-        where: { id: authReq.user.id },
+        where: { id: authReq.user?.id },
         include: {
             aksesPerusahaan: {
                 where: { isAktif: true },
@@ -338,7 +338,7 @@ export const switchCompany = async (req: Request, res: Response) => {
         const access = await prisma.aksesPengguna.findUnique({
             where: {
                 penggunaId_perusahaanId: {
-                    penggunaId: authReq.user.id,
+                    penggunaId: authReq.user?.id || '',
                     perusahaanId: companyId
                 }
             },
@@ -408,6 +408,7 @@ export const changePassword = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const user = authReq.user;
+        if (!user) return res.status(401).json({ message: 'Unauthorized' });
         const validatedData = changePasswordSchema.parse(req.body);
 
         // Verify current password
@@ -474,6 +475,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const user = authReq.user;
+        if (!user) return res.status(401).json({ message: 'Unauthorized' });
         const validatedData = updateProfileSchema.parse(req.body);
 
         const updatedUser = await prisma.pengguna.update({

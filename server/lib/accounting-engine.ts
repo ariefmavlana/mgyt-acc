@@ -1,7 +1,7 @@
-import { Prisma, TipeTransaksi, StatusPeriode } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export class AccountingEngine {
-    constructor(private prisma: any) { }
+    constructor(private prisma: Prisma.TransactionClient) { }
 
     /**
      * Validate if a date falls within an open accounting period
@@ -35,7 +35,8 @@ export class AccountingEngine {
 
         // Simple sequential number based on count for the month
         // In production, this should use a separate sequence table to avoid gaps/dupes
-        const count = await this.prisma[model].count({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const count = await (this.prisma as any)[model].count({
             where: {
                 perusahaanId,
                 createdAt: {
@@ -129,7 +130,12 @@ export class AccountingEngine {
         if (tempAccounts.length === 0) return null; // Nothing to close
 
         let totalNetIncome = 0;
-        const journalDetails: any[] = [];
+        const journalDetails: {
+            akunId: string;
+            deskripsi: string;
+            debit: number;
+            kredit: number;
+        }[] = [];
 
         for (const acc of tempAccounts) {
             const balance = Number(acc.saldoBerjalan);

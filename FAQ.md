@@ -1,69 +1,76 @@
 # ❓ Tanya Jawab Akuntansi & Sistem (FAQ)
 
-Selamat datang di pusat informasi Mgyt Accounting. Dokumen ini dirancang sebagai panduan mandiri untuk Akuntan dan Pengguna sistem.
+Selamat datang di pusat informasi Mgyt Accounting. Dokumen ini dirancang sebagai panduan mandiri untuk Akuntan Profesional dan Pengguna sistem.
 
 ---
 
-## 🏢 Perusahaan & Organisasi
+## 🏢 Konsolidasi & Struktur Organisasi
 
-### 1. Bagaimana sistem menangani banyak perusahaan (Multi-Tenant)?
-Sistem menggunakan isolasi data total. Setiap perusahaan memiliki Chart of Accounts (COA), daftar karyawan, dan laporan keuangan yang sepenuhnya terpisah. Data tidak akan pernah tercampur antar entitas.
+### 1. Bagaimana sistem menangani entitas Kantor Pusat dan Cabang?
+Mgyt Accounting menggunakan basis data tunggal dengan isolasi logis (`cabangId`).
+- **Kantor Pusat**: Memiliki hak akses penuh untuk melihat seluruh transaksi cabang.
+- **Cabang**: Hanya dapat melihat dan menginput data internal mereka sendiri.
+- **Konsolidasi**: Sistem melakukan penggabungan saldo (Aggregation) secara otomatis di laporan Neraca dan Laba Rugi dengan satu klik filter "Seluruh Cabang".
 
-### 2. Apakah saya bisa mengkonsolidasikan laporan antar cabang?
-Ya. Setiap transaksi mencatat `cabangId`. Anda dapat memfilter laporan (Neraca/Laba Rugi) untuk satu cabang tertentu atau melihat akumulasi seluruh cabang dalam satu perusahaan untuk tujuan konsolidasi internal.
-
----
-
-## 💰 Siklus Akuntansi & Jurnal
-
-### 1. Kapan Jurnal Umum dibuat oleh sistem?
-Sistem menganut prinsip **Real-time Journaling**. Jurnal otomatis dibuat saat:
-- **Invoice Penjualan**: Saat status berubah menjadi "APPROVED".
-- **Tagihan Pembelian**: Saat invoice supplier disimpan.
-- **Payroll**: Saat periode gaji di-approve untuk posting.
-- **Penyusutan Aset**: Setiap akhir bulan melalui engine otomatis.
-
-### 2. Bagaimana cara melakukan rekonsiliasi bank?
-Gunakan modul **Voucher / Kas**. Anda dapat mencocokkan setiap baris transaksi bank dengan voucher yang ada. Untuk selisih biaya administrasi atau bunga bank, Anda bisa membuat voucher manual agar saldo di sistem sama dengan rekening koran.
-
-### 3. Apakah ada proses "Tutup Buku" bulanan?
-Secara teknis tidak wajib karena saldo bersifat real-time. Namun, untuk disiplin akuntansi, kami menyarankan Anda menggunakan fitur **Lock Period** (jika diaktifkan oleh Admin) untuk mencegah perubahan data pada bulan yang sudah dilaporkan.
+### 2. Apakah sistem mendukung Multi-Currency?
+Ya. Anda dapat menentukan **Mata Uang Utama** (biasanya IDR) di Settings. Transaksi dalam mata uang asing akan dikonversi menggunakan kurs transaksi saat posting, dan sistem akan menghitung selisih kurs (Laba/Rugi Kurs) secara otomatis saat pelunasan invoice.
 
 ---
 
-## 🧾 Perpajakan Indonesia
+## 💰 Jurnal & Siklus Akuntansi
 
-### 1. Bagaimana perhitungan PPh 21 Karyawan?
-Sistem menggunakan metode **Tarif Efektif Rata-rata (TER)** sesuai regulasi terbaru. Komponen yang dihitung meliputi Gaji Pokok, Tunjangan, dikurangi Biaya Jabatan (5%, max 500rb/bln) dan Iuran BPJS Ketenagakerjaan (JKK, JKM, JHT).
+### 1. Bagaimana alur integrasi dari Invoice ke Buku Besar (GL)?
+Sistem menggunakan **Real-time Journaling**. Saat Invoice atau Tagihan di-approve:
+1. **Pencatatan Sub-Ledger**: Masuk ke buku pembantu Piutang (AR) atau Hutang (AP).
+2. **Double-Entry Journal**: Sistem otomatis mendebit Piutang dan mengkredit Pendapatan (serta PPN Keluaran jika ada).
+3. **Voucher Tracking**: Setiap jurnal memiliki nomor Voucher unik yang dapat dilacak balik ke dokumen sumber.
 
-### 2. Bagaimana cara menangani PPh 23 (Pajak Jasa)?
-Saat mencatat tagihan jasa di modul **Purchase**, Anda dapat memilih kode pajak PPh 23 (2% untuk ber-NPWP). Sistem akan otomatis memotong nilai pembayaran ke supplier dan mencatatnya sebagai *Hutang PPh 23*.
-
-### 3. Apakah sistem mendukung PPN 11%?
-Ya. PPN Keluaran dihitung dari nilai dasar pengenaan pajak (DPP) pada invoice. Laporan PPN setiap masa dapat ditarik untuk membantu pelaporan SPT Masa PPN di aplikasi e-Faktur.
-
----
-
-## 📦 Inventori & Aset
-
-### 1. Mengapa nilai stok saya berbeda dengan perkiraan?
-Mgyt Accounting menggunakan metode **Moving Average**. Nilai persediaan dihitung ulang setiap kali ada pembelian baru masuk. Jika ada retur atau penyesuaian stok, pastikan menggunakan modul **Stock Opname** agar nilai buku dan fisik sinkron.
-
-### 2. Bagaimana perhitungan penyusutan aset tetap?
-Sistem mendukung metode **Garis Lurus**.
-- **Formula**: (Harga Perolehan - Nilai Residu) / Masa Manfaat.
-- Hasil pembagian tahunan dibagi 12 untuk menjadi beban penyusutan bulanan yang dijurnal otomatis ke akun *Beban Penyusutan* (Debit) dan *Akumulasi Penyusutan* (Kredit).
+### 2. Bagaimana cara melakukan Rekonsiliasi Bank yang efektif?
+Gunakan modul **Voucher / Kas**.
+- Pastikan saldo Buku Kas di sistem sama dengan saldo fisik/bank.
+- Jika ada biaya bank yang terpotong otomatis di rekening koran, buatlah **Voucher Keluar** manual untuk mencatat Beban Administrasi Bank agar saldo buku sinkron.
 
 ---
 
-## 🛡️ Keamanan & Integritas
+## 🧾 Perpajakan & Compliance
 
-### 1. Bagaimana jika terjadi kesalahan input yang sudah diposting?
-Data yang sudah diposting ke Buku Besar sebaiknya tidak dihapus. Gunakan fitur **Voucher Pembalik (Reversal)** atau Jurnal Koreksi untuk memperbaiki nilai tersebut. Ini penting untuk menjaga integritas **Audit Trail**.
+### 1. Bagaimana logika pemotongan PPh 21 TER?
+Sistem mengikuti regulasi **Tarif Efektif Rata-rata (TER)** terbaru.
+- Pajak dihitung berdasarkan kategori PTKP (TK/0, K/0, dst).
+- Sistem otomatis menghitung Biaya Jabatan (5%) dan pengurang iuran BPJS yang menjadi beban karyawan (JHT 2%, JP 1%).
 
-### 2. Siapa yang bisa menghapus data?
-Hak hapus data sangat dibatasi. Hanya role **SUPERADMIN** atau user dengan izin khusus yang bisa melakukan penghapusan (Soft Delete). Setiap aksi penghapusan akan tercatat di log Jejak Audit.
+### 2. Bagaimana pemetaan Akun Pajak (Tax Mapping)?
+Setiap kode pajak (PPN, PPh 23) dipetakan ke akun spesifik di COA.
+- **PPN**: Masuk ke akun *Hutang PPN Keluaran* (Penjualan) atau *PPN Masukan* (Pembelian).
+- **PPh 23**: Otomatis dipotong dari nilai pembayaran supplier dan masuk ke akun *Hutang PPh 23*.
 
 ---
 
-> Anda memiliki pertanyaan spesifik seputar PSAK? Tim akutan kami siap membantu melalui saluran dukungan resmi.
+## 📦 Inventori & Aset Tetap
+
+### 1. Mengapa Nilai Persediaan menggunakan Moving Average?
+Metode ini dianggap paling akurat untuk bisnis dengan fluktuasi harga beli yang tinggi. Sistem menghitung ulang rata-rata tertimbang setiap kali ada transaksi **Purchase Order** yang masuk (Received). Ini memastikan HPP (Harga Pokok Penjualan) selalu up-to-date.
+
+### 2. Alur Otomatisasi Penyusutan Aset
+Saat aset didaftarkan:
+1. Pilih **Masa Manfaat** (misal: 4 tahun/48 bulan).
+2. Sistem akan menjadwalkan jurnal penyusutan setiap tanggal akhir bulan.
+3. Jurnal: `(D) Beban Penyusutan` vs `(K) Akumulasi Penyusutan`.
+
+---
+
+## 🛡️ Integritas & Keamanan
+
+### 1. Apa itu "Lock Period" dan kapan harus digunakan?
+Lock Period mencegah perubahan data pada tanggal tertentu ke belakang. Ini wajib digunakan setelah laporan bulanan dilaporkan ke manajemen/pajak untuk mencegah perubahan angka historis secara tidak sengaja.
+
+### 2. Bagaimana Audit Trail membantu akuntan?
+Setiap aksi (Create, Update, Delete) pada transaksi sensitif mencatat:
+- Siapa yang melakukan.
+- Waktu (Timestamp) yang tepat.
+- Perubahan nominal (sebelum vs sesudah).
+Ini sangat membantu saat pelacakan selisih saldo atau pemeriksaan internal.
+
+---
+
+> Membutuhkan bantuan lebih lanjut mengenai PSAK? Tim akuntan senior kami siap membantu melalui fitur **Support** di dashboard.

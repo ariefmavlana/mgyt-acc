@@ -38,6 +38,7 @@ import { createBudgetSchema } from '@/server/validators/budget.validator';
 import { useBudget } from '@/hooks/use-budget';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { HelpIndicator } from '@/components/ui/help-indicator';
 
 interface BudgetFormProps {
     initialData?: any;
@@ -100,7 +101,6 @@ export function BudgetForm({ initialData, accounts, departments, projects }: Bud
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-20">
-                {/* Section 1: Konfigurasi Anggaran */}
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-wider">
                         <LayoutGrid className="w-4 h-4" />
@@ -161,13 +161,13 @@ export function BudgetForm({ initialData, accounts, departments, projects }: Bud
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Briefcase className="w-4 h-4 text-slate-400" /> Tipe Anggaran
+                                                Tipe Anggaran <HelpIndicator message="Operasional: Biaya rutin harian. Modal: Pengadaan aset besar. Departemen/Proyek: Anggaran khusus unit kerja." />
                                             </FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl><SelectTrigger className="bg-white"><SelectValue placeholder="Pilih Tipe" /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     <SelectItem value="OPERASIONAL">Operasional</SelectItem>
-                                                    <SelectItem value="MODAL">Modal (CAPEX)</SelectItem>
+                                                    <SelectItem value="MODAL">Modal (Aset)</SelectItem>
                                                     <SelectItem value="KAS">Arus Kas</SelectItem>
                                                     <SelectItem value="DEPARTEMEN">Per Departemen</SelectItem>
                                                     <SelectItem value="PROYEK">Per Proyek</SelectItem>
@@ -222,7 +222,6 @@ export function BudgetForm({ initialData, accounts, departments, projects }: Bud
                     </Card>
                 </div>
 
-                {/* Section 2: Line Items */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-wider">
@@ -242,100 +241,102 @@ export function BudgetForm({ initialData, accounts, departments, projects }: Bud
 
                     <Card className="border-slate-200/60 shadow-sm bg-white overflow-hidden">
                         <CardContent className="p-0">
-                            <table className="w-full text-sm">
-                                <thead className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left w-2/5">Akun Anggaran</th>
-                                        <th className="px-6 py-3 text-left">Periode (Bulan)</th>
-                                        <th className="px-6 py-3 text-right">Target Anggaran (Rp)</th>
-                                        <th className="px-1 py-3 text-center w-12"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {fields.map((field, index) => (
-                                        <tr key={field.id} className="hover:bg-slate-50/40 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <FormField
-                                                    control={form.control}
-                                                    name={`details.${index}.akunId`}
-                                                    render={({ field }) => (
-                                                        <FormItem className="space-y-0">
-                                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                                <FormControl><SelectTrigger className="h-9 bg-white"><SelectValue placeholder="Pilih Akun" /></SelectTrigger></FormControl>
-                                                                <SelectContent>
-                                                                    {accounts.map(acc => (
-                                                                        <SelectItem key={acc.id} value={acc.id}>{acc.kodeAkun} - {acc.namaAkun}</SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <FormField
-                                                    control={form.control}
-                                                    name={`details.${index}.periode`}
-                                                    render={({ field }) => (
-                                                        <FormItem className="space-y-0">
-                                                            <Input
-                                                                type="month"
-                                                                className="h-9 bg-white"
-                                                                value={field.value instanceof Date ? field.value.toISOString().slice(0, 7) : field.value}
-                                                                onChange={e => field.onChange(new Date(e.target.value))}
-                                                            />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <FormField
-                                                    control={form.control}
-                                                    name={`details.${index}.jumlahBudget`}
-                                                    render={({ field }) => (
-                                                        <FormItem className="space-y-0">
-                                                            <div className="relative">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left w-2/5">Akun Anggaran</th>
+                                            <th className="px-6 py-3 text-left">Periode (Bulan)</th>
+                                            <th className="px-6 py-3 text-right">Target Anggaran (Rp)</th>
+                                            <th className="px-1 py-3 text-center w-12"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {fields.map((field, index) => (
+                                            <tr key={field.id} className="hover:bg-slate-50/40 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`details.${index}.akunId`}
+                                                        render={({ field }) => (
+                                                            <FormItem className="space-y-0">
+                                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                                    <FormControl><SelectTrigger className="h-9 bg-white"><SelectValue placeholder="Pilih Akun" /></SelectTrigger></FormControl>
+                                                                    <SelectContent>
+                                                                        {accounts.map(acc => (
+                                                                            <SelectItem key={acc.id} value={acc.id}>{acc.kodeAkun} - {acc.namaAkun}</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`details.${index}.periode`}
+                                                        render={({ field }) => (
+                                                            <FormItem className="space-y-0">
+                                                                <Input
+                                                                    type="month"
+                                                                    className="h-9 bg-white"
+                                                                    value={field.value instanceof Date ? field.value.toISOString().slice(0, 7) : field.value}
+                                                                    onChange={e => field.onChange(new Date(e.target.value))}
+                                                                />
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <FormField
+                                                        control={form.control}
+                                                        name={`details.${index}.jumlahBudget`}
+                                                        render={({ field }) => (
+                                                            <FormItem className="space-y-0">
                                                                 <Input
                                                                     type="number"
                                                                     className="h-9 pl-3 text-right font-mono bg-white"
                                                                     {...field}
                                                                     onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
                                                                 />
-                                                            </div>
-                                                        </FormItem>
-                                                    )}
-                                                />
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </td>
+                                                <td className="px-1 py-4 text-center">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full"
+                                                        onClick={() => remove(index)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot className="bg-slate-50/50">
+                                        <tr>
+                                            <td colSpan={2} className="px-6 py-4 font-bold text-slate-800 text-right">TOTAL ANGGARAN:</td>
+                                            <td className="px-6 py-4 font-bold text-slate-900 text-right text-lg font-mono">
+                                                {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(totalBudget)}
                                             </td>
-                                            <td className="px-1 py-4 text-center">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full"
-                                                    onClick={() => remove(index)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </td>
+                                            <td></td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                                <tfoot className="bg-slate-50/50">
-                                    <tr>
-                                        <td colSpan={2} className="px-6 py-4 font-bold text-slate-800 text-right">TOTAL ANGGARAN:</td>
-                                        <td className="px-6 py-4 font-bold text-slate-900 text-right text-lg font-mono">
-                                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(totalBudget)}
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </CardContent>
                     </Card>
                     <p className="text-xs text-slate-400 italic font-medium px-2">* Anda dapat menambahkan baris baru untuk setiap akun dan periode yang berbeda.</p>
                 </div>
 
-                {/* Footer Actions */}
                 <div className="flex items-center justify-end gap-3 sticky bottom-4 bg-white/95 backdrop-blur-md p-3 px-5 rounded-2xl border border-slate-200/60 shadow-xl z-20 animate-in slide-in-from-bottom-8 duration-700 ease-out">
                     <Button
                         type="button"

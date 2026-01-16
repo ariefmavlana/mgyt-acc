@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Search, Download, Loader2, Filter, ChevronRight, X, Briefcase, Building2, UserCheck, UserMinus, Clock } from 'lucide-react';
+import { UserPlus, Search, Download, Loader2, Filter, ChevronRight, X, Briefcase, Building2, Clock } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useHR } from '@/hooks/use-hr';
@@ -17,7 +17,6 @@ import { useDebounce } from '@/hooks/use-debounce';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
     DropdownMenuTrigger,
     DropdownMenuLabel,
     DropdownMenuSeparator,
