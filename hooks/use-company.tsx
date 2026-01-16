@@ -67,19 +67,21 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setLoading(true);
             const res = await api.get('/companies');
             setCompanies(res.data.companies);
-
-            // Auto-set current company if not set
-            if (!currentCompany && res.data.companies.length > 0) {
-                const savedId = localStorage.getItem('activeCompanyId');
-                const active = res.data.companies.find((c: Company) => c.id === savedId) || res.data.companies[0];
-                setCurrentCompany(active);
-            }
         } catch (err) {
             console.error('Failed to fetch companies', err);
         } finally {
             setLoading(false);
         }
-    }, [user, currentCompany]);
+    }, [user]);
+
+    // Auto-set current company if not set
+    useEffect(() => {
+        if (companies.length > 0 && !currentCompany) {
+            const savedId = localStorage.getItem('activeCompanyId');
+            const active = companies.find((c: Company) => c.id === savedId) || companies[0];
+            setCurrentCompany(active);
+        }
+    }, [companies, currentCompany]);
 
     useEffect(() => {
         if (user) {

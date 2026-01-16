@@ -291,6 +291,30 @@ export const createBranch = async (req: Request, res: Response) => {
 
         if (!perusahaanId) return res.status(400).json({ message: 'Perusahaan tidak ditemukan' });
 
+        // Tier check logic
+        const activePaket = await prisma.perusahaanPaket.findFirst({
+            where: { perusahaanId, isAktif: true },
+            include: { paket: true }
+        });
+
+        const currentTier = activePaket?.paket?.tier || 'UMKM';
+        const branchCount = await prisma.cabang.count({ where: { perusahaanId } });
+
+        const tierLimits: Record<string, number> = {
+            'UMKM': 1,
+            'SMALL': 5,
+            'MEDIUM': 20,
+            'ENTERPRISE': 99999
+        };
+
+        if (branchCount >= (tierLimits[currentTier] || 1)) {
+            return res.status(403).json({
+                message: `Batas cabang untuk paket ${currentTier} telah tercapai (${tierLimits[currentTier]}).`,
+                upgradeRequired: true,
+                suggestion: currentTier === 'UMKM' ? 'Silakan upgrade ke paket Small untuk menambah hingga 5 cabang.' : 'Silakan upgrade paket Anda untuk menambah lebih banyak cabang.'
+            });
+        }
+
         const branch = await prisma.cabang.create({
             data: {
                 ...data,

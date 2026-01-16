@@ -1,10 +1,19 @@
 import { Router } from 'express';
-import { protect } from '../middleware/auth.middleware';
-import { getTaxes, createTax, updateTax, deleteTax, getTaxReport, fileTaxReport, getFiledTaxReports } from '../controllers/tax.controller';
+import {
+    getTaxes,
+    createTax,
+    updateTax,
+    deleteTax,
+    getTaxReport,
+    fileTaxReport,
+    getFiledTaxReports
+} from '../controllers/tax.controller';
+import { protect, restrictTo } from '../middleware/auth.middleware';
 
 const router = Router();
 
 router.use(protect);
+router.use(restrictTo('ADMIN', 'TAX_OFFICER', 'ACCOUNTANT', 'SENIOR_ACCOUNTANT', 'CFO'));
 
 router.get('/', getTaxes);
 router.post('/', createTax);

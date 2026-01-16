@@ -34,9 +34,15 @@ const registerSchema = z.object({
     path: ["confirmPassword"],
 });
 
+import { OnboardingSurvey } from './onboarding-survey';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { InfoIcon, Sparkles, ArrowLeft } from 'lucide-react';
+
 export const RegisterForm = () => {
-    const { register } = useAuth();
+    const { register: authRegister } = useAuth();
     const [isPending, setIsPending] = React.useState(false);
+    const [step, setStep] = React.useState<'survey' | 'form'>('survey');
+    const [recommendedTier, setRecommendedTier] = React.useState<string | null>(null);
 
     const form = useForm<z.infer<typeof registerSchema>>({
         resolver: zodResolver(registerSchema),
@@ -47,15 +53,25 @@ export const RegisterForm = () => {
             namaPerusahaan: '',
             password: '',
             confirmPassword: '',
-            role: 'ADMIN', // Default to ADMIN for first user usually, or changes per business logic
+            role: 'ADMIN',
             paket: 'UMKM',
         },
     });
 
+    const onSurveyComplete = (tier: string) => {
+        setRecommendedTier(tier);
+        form.setValue('paket', tier as "UMKM" | "SMALL" | "MEDIUM" | "ENTERPRISE");
+        setStep('form');
+    };
+
+    if (step === 'survey') {
+        return <OnboardingSurvey onComplete={onSurveyComplete} />;
+    }
+
     async function onSubmit(values: z.infer<typeof registerSchema>) {
         setIsPending(true);
         try {
-            await register(values);
+            await authRegister(values);
         } catch {
             // Error handled in AuthProvider toast
         } finally {
@@ -66,6 +82,16 @@ export const RegisterForm = () => {
     return (
         <Card className="w-full max-w-lg mx-auto">
             <CardHeader className="space-y-1">
+                <div className="flex justify-between items-center mb-2">
+                    <Button variant="ghost" size="sm" onClick={() => setStep('survey')} className="text-xs">
+                        <ArrowLeft className="mr-1 h-3 w-3" /> Ulangi Survey
+                    </Button>
+                    {recommendedTier && (
+                        <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> Rekomendasi: {recommendedTier}
+                        </div>
+                    )}
+                </div>
                 <CardTitle className="text-2xl font-bold text-center">Daftar Akun Baru</CardTitle>
                 <CardDescription className="text-center">
                     Lengkapi data di bawah ini untuk memulai sistem akuntansi Anda
@@ -105,7 +131,7 @@ export const RegisterForm = () => {
                             name="email"
                             render={({ field }) => (
                                 <FormItem className="md:col-span-2">
-                                    <FormLabel>Email</FormLabel>
+                                    <FormLabel>Email Profesional</FormLabel>
                                     <FormControl>
                                         <Input placeholder="nama@perusahaan.com" {...field} disabled={isPending} />
                                     </FormControl>
@@ -126,22 +152,33 @@ export const RegisterForm = () => {
                                 </FormItem>
                             )}
                         />
+
+                        <div className="md:col-span-2">
+                            <Alert className="bg-blue-50 border-blue-200">
+                                <InfoIcon className="h-4 w-4 text-blue-500" />
+                                <AlertTitle className="text-blue-700 text-xs font-bold">Rencana Anda</AlertTitle>
+                                <AlertDescription className="text-blue-600 text-xs">
+                                    Berdasarkan survey, kami telah memilihkan paket **{recommendedTier}**. Anda dapat mengubahnya jika perlu.
+                                </AlertDescription>
+                            </Alert>
+                        </div>
+
                         <FormField
                             control={form.control}
                             name="paket"
                             render={({ field }) => (
                                 <FormItem className="md:col-span-2">
-                                    <FormLabel>Paket Usaha</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
+                                    <FormLabel>Paket yang Dipilih</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isPending}>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Pilih paket usaha" />
+                                            <SelectTrigger className="border-2 border-primary/20 focus:border-primary">
+                                                <SelectValue />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="UMKM">UMKM (Micro)</SelectItem>
-                                            <SelectItem value="SMALL">Starter (Small Business)</SelectItem>
-                                            <SelectItem value="MEDIUM">Growth (Medium Business)</SelectItem>
+                                            <SelectItem value="UMKM">UMKM (Free / Micro)</SelectItem>
+                                            <SelectItem value="SMALL">Small Business</SelectItem>
+                                            <SelectItem value="MEDIUM">Medium Business</SelectItem>
                                             <SelectItem value="ENTERPRISE">Enterprise (Corporate)</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -149,6 +186,7 @@ export const RegisterForm = () => {
                                 </FormItem>
                             )}
                         />
+
                         <FormField
                             control={form.control}
                             name="role"

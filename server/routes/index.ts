@@ -26,6 +26,7 @@ import payrollRoutes from './payroll.routes';
 import organizationRoutes from './organization.routes';
 import recurringRoutes from './recurring.routes';
 import notificationRoutes from './notification.routes';
+import subscriptionRoutes from './subscription.routes';
 
 const router = express.Router();
 
@@ -56,5 +57,6 @@ router.use('/payroll', payrollRoutes);
 router.use('/organization', organizationRoutes);
 router.use('/recurring', recurringRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/subscriptions', subscriptionRoutes);
 
 export default router;

@@ -58,6 +58,21 @@ api.interceptors.request.use(async (config) => {
     return config;
 });
 
+// Queue for handling multiple 401s during a single refresh cycle
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+    failedQueue.forEach((prom) => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
 // Interceptor to handle token refresh and CSRF errors
 api.interceptors.response.use(
     (response) => response,
@@ -80,7 +95,21 @@ api.interceptors.response.use(
 
         // If 401 and not already retrying
         if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
+
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                })
+                    .then(() => {
+                        return api(originalRequest);
+                    })
+                    .catch((err) => {
+                        return Promise.reject(err);
+                    });
+            }
+
             originalRequest._retry = true;
+            isRefreshing = true;
 
             try {
                 await axios.post(
@@ -88,10 +117,15 @@ api.interceptors.response.use(
                     {},
                     { withCredentials: true }
                 );
+
+                processQueue(null);
                 return api(originalRequest);
             } catch (refreshError) {
-                // Refresh token failed
+                processQueue(refreshError);
+                // Refresh token failed - optional: redirect to login or let useAuth handle it
                 return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
             }
         }
 

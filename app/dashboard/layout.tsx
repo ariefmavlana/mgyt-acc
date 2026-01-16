@@ -16,108 +16,30 @@ import {
 import {
     LayoutDashboard,
     Building2,
-    FileText,
     Users,
     Settings,
     LogOut,
     Menu,
     X,
     ChevronRight,
-    FolderTree,
-    Package,
-    Box,
-    Receipt,
-    TrendingUp,
-    FileSignature,
-    Banknote,
-    Activity,
-    HelpCircle,
-    Percent,
-    PieChart,
-    RefreshCw,
-    BarChart2,
-    Target,
-    LayoutGrid
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { NotificationDropdown } from '@/components/notifications/notification-dropdown';
+import { filterMenuByRoleAndTier } from '@/lib/menu-config';
+import { useCompany } from '@/hooks/use-company';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { loading } = useRequireAuth();
     const { user, logout } = useAuth();
+    const { currentCompany } = useCompany();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const pathname = usePathname();
 
-    const menuGroups = [
-        {
-            title: '',
-            items: [
-                { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-            ]
-        },
-        {
-            title: 'Akuntansi & Keuangan',
-            items: [
-                { name: 'Buku Besar', href: '/dashboard/coa', icon: FolderTree },
-                { name: 'Voucher / Kas', href: '/dashboard/transactions', icon: FileText },
-                { name: 'Laporan Keuangan', href: '/dashboard/reports', icon: BarChart2 },
-                { name: 'Master Pajak', href: '/dashboard/tax', icon: Percent },
-                { name: 'Aset Tetap', href: '/dashboard/assets', icon: Box },
-                { name: 'Anggaran', href: '/dashboard/budget', icon: PieChart },
-            ]
-        },
-        {
-            title: 'Operasional',
-            items: [
-                { name: 'Penjualan (AR)', href: '/dashboard/invoices', icon: TrendingUp },
-                { name: 'Pembelian (AP)', href: '/dashboard/bills', icon: Receipt },
-                { name: 'Persediaan', href: '/dashboard/inventory', icon: Package },
-                { name: 'Produk', href: '/dashboard/products', icon: Box },
-            ]
-        },
-        {
-            title: 'Organisasi',
-            items: [
-                { name: 'Cost Center', href: '/dashboard/organization/cost-centers', icon: Target },
-                { name: 'Profit Center', href: '/dashboard/organization/profit-centers', icon: TrendingUp },
-                { name: 'Cabang', href: '/dashboard/settings?tab=branches', icon: Building2 },
-                { name: 'Departemen', href: '/dashboard/hr/departments', icon: Building2 },
-                { name: 'Proyek', href: '/dashboard/organization/projects', icon: LayoutGrid },
-            ]
-        },
-        {
-            title: 'SDM & Gaji',
-            items: [
-                { name: 'Karyawan', href: '/dashboard/employees', icon: Users },
-                { name: 'Kontrak Kerja', href: '/dashboard/contracts', icon: FileSignature },
-                { name: 'Penggajian', href: '/dashboard/hr/payroll', icon: Banknote },
-            ]
-        },
-        {
-            title: 'Sistem & Perusahaan',
-            items: [
-                { name: 'Profil Perusahaan', href: '/dashboard/companies', icon: Building2 },
-                { name: 'Audit Trail', href: '/dashboard/audit', icon: Activity },
-                { name: 'Transaksi Berulang', href: '/dashboard/system/recurring', icon: RefreshCw },
-                { name: 'Pengaturan', href: '/dashboard/settings', icon: Settings },
-                { name: 'Bantuan', href: '/dashboard/help', icon: HelpCircle },
-            ]
-        }
-    ];
-
-    const filteredMenuGroups = menuGroups.map(group => ({
-        ...group,
-        items: group.items.filter(item => {
-            // Basic role filtering
-            if (user?.role === 'STAFF' || user?.role === 'VIEWER') {
-                if (['Settings', 'Audit Trail', 'Profil Perusahaan', 'Pengaturan'].includes(item.name)) return false;
-            }
-            return true;
-        })
-    })).filter(group => group.items.length > 0);
+    const currentTier = (currentCompany as any)?.perusahaanPakets?.[0]?.paket?.tier || 'UMKM';
+    const filteredMenuGroups = filterMenuByRoleAndTier(user?.role || 'STAFF', currentTier);
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-screen bg-slate-50">

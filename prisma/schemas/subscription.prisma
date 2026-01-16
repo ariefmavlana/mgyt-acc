@@ -30,8 +30,9 @@ model PaketFitur {
     fitur      FiturModul[]
     perusahaan PerusahaanPaket[]
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    createdAt            DateTime              @default(now())
+    updatedAt            DateTime              @updatedAt
+    subscriptionRequests SubscriptionRequest[]
 
     @@index([tier, isAktif])
 }
@@ -86,5 +87,31 @@ model PerusahaanPaket {
 }
 
 // ============================================================================
-// MULTI-CURRENCY MANAGEMENT
+// MULTI-CURRENCY MANAGEMENT (Placeholder)
 // ============================================================================
+
+model SubscriptionRequest {
+    id           String     @id @default(cuid())
+    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaanId String
+
+    requester   Pengguna @relation("Requester", fields: [requesterId], references: [id])
+    requesterId String
+
+    paketTarget   PaketFitur @relation(fields: [paketTargetId], references: [id])
+    paketTargetId String
+
+    status  StatusApproval @default(PENDING)
+    catatan String?
+
+    approver   Pengguna? @relation("Approver", fields: [approverId], references: [id])
+    approverId String?
+
+    tanggalApproval DateTime?
+    alasanPenolakan String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([perusahaanId, status])
+}
