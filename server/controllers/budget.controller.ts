@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../../lib/prisma';
 import { createBudgetSchema, updateBudgetSchema, budgetQuerySchema } from '../validators/budget.validator';
 import { Prisma, Budget, BudgetDetail } from '@prisma/client';
+import { AuthRequest } from '../middleware/auth.middleware';
 
 interface BudgetWithDetails extends Budget {
     detail: BudgetDetail[];
@@ -113,12 +114,16 @@ export const createBudget = async (req: Request, res: Response) => {
 
 export const updateBudget = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
         const { id } = req.params;
         const validatedData = updateBudgetSchema.parse(req.body);
 
         const existingBudget = await prisma.budget.findUnique({
             where: { id: id as string },
-            include: { detail: true }
+            include: {
+                detail: true,
+                revisi: { orderBy: { versi: 'desc' }, take: 1 }
+            }
         });
 
         if (!existingBudget) return res.status(404).json({ message: 'Budget tidak ditemukan' });
@@ -127,14 +132,34 @@ export const updateBudget = async (req: Request, res: Response) => {
         }
 
         const result = await prisma.$transaction(async (tx) => {
-            // Update details if provided
+            let totalBudget = existingBudget.totalBudget;
+
+            // Detect if a revision is needed (total budget changes)
             if (validatedData.details) {
-                // Simplified: delete all existing and recreating
-                await tx.budgetDetail.deleteMany({ where: { budgetId: id } });
+                const newTotalBudget = new Prisma.Decimal(validatedData.details.reduce((sum, item) => sum + item.jumlahBudget, 0));
 
-                const totalBudget = validatedData.details.reduce((sum, item) => sum + item.jumlahBudget, 0);
+                if (!newTotalBudget.equals(existingBudget.totalBudget)) {
+                    const nextVersion = (existingBudget.revisi[0]?.versi || 0) + 1;
+                    await tx.budgetRevisi.create({
+                        data: {
+                            budgetId: id as string,
+                            versi: nextVersion,
+                            tanggalRevisi: new Date(),
+                            alasanRevisi: validatedData.alasanRevisi || 'Penyesuaian Anggaran',
+                            catatan: validatedData.catatanRevisi || null,
+                            jumlahSebelum: existingBudget.totalBudget,
+                            jumlahSesudah: newTotalBudget,
+                            direvisiOleh: authReq.user?.id || 'System'
+                        }
+                    });
+                }
 
-                return await tx.budget.update({
+                totalBudget = newTotalBudget;
+
+                // Update details: delete and recreate
+                await tx.budgetDetail.deleteMany({ where: { budgetId: id as string } });
+
+                await tx.budget.update({
                     where: { id: id as string },
                     data: {
                         nama: validatedData.nama,
@@ -153,15 +178,20 @@ export const updateBudget = async (req: Request, res: Response) => {
                         }
                     }
                 });
+            } else {
+                await tx.budget.update({
+                    where: { id: id as string },
+                    data: {
+                        nama: validatedData.nama,
+                        deskripsi: validatedData.deskripsi,
+                        status: validatedData.status
+                    }
+                });
             }
 
-            return await tx.budget.update({
+            return await tx.budget.findUnique({
                 where: { id: id as string },
-                data: {
-                    nama: validatedData.nama,
-                    deskripsi: validatedData.deskripsi,
-                    status: validatedData.status
-                }
+                include: { detail: true, revisi: true }
             });
         });
 

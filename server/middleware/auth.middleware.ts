@@ -4,11 +4,11 @@ import prisma from '../../lib/prisma';
 import { Pengguna, AksesPengguna, Role, UserRole } from '@prisma/client';
 
 export type AksesWithRole = AksesPengguna & {
-    roleRef?: any;
+    roleRef?: Role | null;
 };
 
 export interface AuthRequest extends Request {
-    user: any;
+    user: (Pengguna & { aksesPerusahaan: AksesWithRole[] }) | null;
     akses?: AksesWithRole;
     currentCompanyId?: string;
 }
@@ -53,7 +53,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
         return res.status(401).json({ message: 'Akun Anda sedang tidak aktif. Silakan hubungi admin.' });
     }
 
-    authReq.user = currentUser;
+    authReq.user = currentUser as (Pengguna & { aksesPerusahaan: AksesWithRole[] });
     // Default to the first active company access if available
     const aksesList = currentUser.aksesPerusahaan as AksesWithRole[];
 
@@ -65,13 +65,25 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     next();
 };
 
-export const restrictTo = (...roles: UserRole[]) => {
+export const restrictTo = (...roles: (UserRole | string)[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         const authReq = req as AuthRequest;
-        // Check role from currently active company context
-        if (!authReq.akses || !roles.includes(authReq.akses.roleEnum)) {
+
+        if (!authReq.akses) {
+            return res.status(403).json({ message: 'Anda tidak memiliki akses ke perusahaan ini.' });
+        }
+
+        const userRoleEnum = authReq.akses.roleEnum;
+        const userRoleName = authReq.akses.roleRef?.name;
+
+        const hasPermission = roles.some(role =>
+            role === userRoleEnum || (userRoleName && role === userRoleName)
+        );
+
+        if (!hasPermission) {
             return res.status(403).json({ message: 'Anda tidak memiliki izin untuk melakukan tindakan ini.' });
         }
+
         next();
     };
 };

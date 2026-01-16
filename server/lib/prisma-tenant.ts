@@ -36,7 +36,7 @@ export const tenantExtension = Prisma.defineExtension((client) => {
                     // Normalize model name for comparison
                     const modelName = model || '';
 
-                    if (EXCLUDED_MODELS.some(m => m.toLowerCase() === modelName.toLowerCase())) {
+                    if (!modelName || EXCLUDED_MODELS.some(m => m.toLowerCase() === modelName.toLowerCase())) {
                         return query(args);
                     }
 

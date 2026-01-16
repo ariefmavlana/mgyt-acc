@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth';
@@ -18,6 +19,20 @@ interface Company {
     tier: string;
     mataUangUtama: string;
     tahunBuku: number;
+    bulanMulaiFiskal: number;
+}
+
+export interface Branch {
+    id: string;
+    kode: string;
+    nama: string;
+    alamat?: string | null;
+    kota?: string | null;
+    telepon?: string | null;
+    email?: string | null;
+    kepala?: string | null;
+    isAktif: boolean;
+    isKantor: boolean;
 }
 
 interface CompanyContextType {
@@ -29,6 +44,12 @@ interface CompanyContextType {
     createCompany: (data: Record<string, unknown>) => Promise<unknown>;
     updateCompany: (id: string, data: Partial<Company>) => Promise<unknown>;
     updateSettings: (id: string, data: Record<string, unknown>) => Promise<void>;
+    useBranches: () => { data: Branch[] | undefined, isLoading: boolean, error: any };
+    createBranch: (data: Partial<Branch>) => Promise<Branch>;
+    updateBranch: (id: string, data: Partial<Branch>) => Promise<Branch>;
+    deleteBranch: (id: string) => Promise<{ message: string }>;
+    currentBranch: Branch | null;
+    switchBranch: (id: string) => void;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -37,6 +58,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { user } = useAuth();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
+    const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
     const [loading, setLoading] = useState(true);
 
     const fetchCompanies = useCallback(async () => {
@@ -74,7 +96,6 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setCurrentCompany(target);
             localStorage.setItem('activeCompanyId', id);
             toast.success(`Beralih ke perusahaan: ${target.nama}`);
-            // Optionally reload page or update relevant context
             window.location.reload();
         }
     };
@@ -97,7 +118,6 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const res = await api.put(`/companies/${id}`, data);
             toast.success('Profil perusahaan berhasil diperbarui');
             await fetchCompanies();
-            // If updating current company, update state
             if (currentCompany?.id === id) {
                 setCurrentCompany({ ...currentCompany, ...res.data });
             }
@@ -121,6 +141,57 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     };
 
+    const useBranches = () => {
+        return useQuery({
+            queryKey: ['branches', currentCompany?.id],
+            queryFn: async () => {
+                if (!currentCompany?.id) return [];
+                const res = await api.get('/companies/branches');
+                return res.data as Branch[];
+            },
+            enabled: !!currentCompany?.id
+        });
+    };
+
+    const queryClient = useQueryClient();
+
+    const createBranch = async (data: Partial<Branch>) => {
+        const res = await api.post('/companies/branches', data);
+        queryClient.invalidateQueries({ queryKey: ['branches'] });
+        return res.data;
+    };
+
+    const updateBranch = async (id: string, data: Partial<Branch>) => {
+        const res = await api.put(`/companies/branches/${id}`, data);
+        queryClient.invalidateQueries({ queryKey: ['branches'] });
+        return res.data;
+    };
+
+    const deleteBranch = async (id: string) => {
+        const res = await api.delete(`/companies/branches/${id}`);
+        queryClient.invalidateQueries({ queryKey: ['branches'] });
+        return res.data;
+    };
+
+    const switchBranch = (id: string) => {
+        const branches = queryClient.getQueryData<Branch[]>(['branches', currentCompany?.id]);
+        const branch = branches?.find(b => b.id === id);
+        if (branch) {
+            setCurrentBranch(branch);
+            localStorage.setItem('activeBranchId', id);
+        } else if (id === 'ALL') {
+            setCurrentBranch(null);
+            localStorage.removeItem('activeBranchId');
+        }
+    };
+
+    useEffect(() => {
+        const savedBranchId = localStorage.getItem('activeBranchId');
+        if (savedBranchId) {
+            // We wait for branches query to be successful to auto-select
+        }
+    }, [currentCompany]);
+
     return (
         <CompanyContext.Provider value={{
             companies,
@@ -130,7 +201,13 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             switchCompany,
             createCompany: createNewCompany,
             updateCompany,
-            updateSettings
+            updateSettings,
+            useBranches,
+            createBranch,
+            updateBranch,
+            deleteBranch,
+            currentBranch,
+            switchBranch
         }}>
             {children}
         </CompanyContext.Provider>

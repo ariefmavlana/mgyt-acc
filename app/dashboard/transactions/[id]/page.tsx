@@ -129,7 +129,7 @@ export default function TransactionDetailPage() {
                             </Button>
                         )}
                         {transaction.isVoid && (
-                            <Badge variant="destructive">VOIDED</Badge>
+                            <Badge variant="destructive">DIBATALKAN</Badge>
                         )}
                     </div>
                 </div>

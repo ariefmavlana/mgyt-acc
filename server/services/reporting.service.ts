@@ -21,11 +21,12 @@ export interface SupplierAging extends AgingBucket {
 }
 
 export class ReportingService {
-    static async calculateARAging(perusahaanId: string) {
+    static async calculateARAging(perusahaanId: string, cabangId?: string) {
         const piutangs = await prisma.piutang.findMany({
             where: {
                 perusahaanId,
                 sisaPiutang: { gt: 0 },
+                transaksi: cabangId ? { cabangId } : undefined
             },
             include: {
                 pelanggan: {
@@ -76,11 +77,12 @@ export class ReportingService {
         return Object.values(report);
     }
 
-    static async calculateAPAging(perusahaanId: string) {
+    static async calculateAPAging(perusahaanId: string, cabangId?: string) {
         const hutangs = await prisma.hutang.findMany({
             where: {
                 perusahaanId,
                 sisaHutang: { gt: 0 },
+                transaksi: cabangId ? { cabangId } : undefined
             },
             include: {
                 pemasok: {

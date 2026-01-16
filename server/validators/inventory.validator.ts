@@ -10,6 +10,9 @@ export const stockMovementSchema = z.object({
     referensi: z.string().optional(),
     keterangan: z.string().optional(),
 
+    // Accounting Integration
+    akunId: z.string().optional(), // The contra-account for adjustments (e.g. Adjustment Expense/Loss)
+
     items: z.array(z.object({
         produkId: z.string().min(1, 'Produk harus dipilih'),
         kuantitas: z.coerce.number().refine(val => val !== 0, 'Kuantitas tidak boleh 0'),

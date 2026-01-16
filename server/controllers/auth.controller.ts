@@ -47,6 +47,8 @@ export const register = async (req: Request, res: Response) => {
                     data: {
                         nama: validatedData.namaPerusahaan,
                         kode: validatedData.namaPerusahaan.substring(0, 3).toUpperCase() + Math.floor(Math.random() * 1000),
+                        tahunBuku: validatedData.tahunBuku,
+                        bulanMulaiFiskal: validatedData.bulanMulaiFiskal,
                     }
                 });
                 perusahaanId = perusahaan.id;

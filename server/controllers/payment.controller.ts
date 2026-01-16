@@ -16,6 +16,7 @@ const createPaymentSchema = z.object({
     bankRekeningId: z.string().optional(),
     nomorReferensi: z.string().optional(),
     catatan: z.string().optional(),
+    cabangId: z.string().optional(),
 });
 
 export const receivePayment = async (req: Request, res: Response) => {
@@ -81,6 +82,7 @@ export const receivePayment = async (req: Request, res: Response) => {
                     nomorVoucher: `RCP-${Date.now().toString().slice(-8)}`, // Use a better generator in a real service
                     tanggal,
                     tipe: 'KAS_MASUK',
+                    cabangId: validatedData.cabangId,
                     deskripsi: validatedData.catatan || `Pembayaran Pelanggan`,
                     totalDebit: totalAmount,
                     totalKredit: totalAmount,
@@ -186,6 +188,7 @@ export const receivePayment = async (req: Request, res: Response) => {
                     perusahaanId,
                     periodeId: (await tx.periodeAkuntansi.findFirst({ where: { perusahaanId, status: 'TERBUKA' } }))?.id!,
                     voucherId: voucher.id,
+                    cabangId: validatedData.cabangId,
                     nomorJurnal: `GL-${voucher.nomorVoucher}`,
                     tanggal,
                     deskripsi: voucher.deskripsi,

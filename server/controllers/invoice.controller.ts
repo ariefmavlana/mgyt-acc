@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma, StatusPembayaran } from '@prisma/client';
 import { createInvoiceSchema } from '../validators/invoice.validator';
 import { addDays, differenceInDays, format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -21,7 +21,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
         const validatedData = createInvoiceSchema.parse(req.body);
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (transactionClient: Prisma.TransactionClient) => {
             // 1. Setup Dates
             const tanggal = new Date(validatedData.tanggal);
             const jatuhTempo = validatedData.tanggalJatuhTempo
@@ -33,27 +33,29 @@ export const createInvoice = async (req: Request, res: Response) => {
             const invNo = validatedData.nomorInvoice || `INV/${year}/${month}/${Date.now().toString().slice(-4)}`;
 
             // 2. PRE-FETCH DATA
-            const productIds = validatedData.items.filter(i => i.produkId).map(i => i.produkId!);
+            const productIds = validatedData.items
+                .filter((item: { produkId?: string | null }) => item.produkId)
+                .map((item: { produkId?: string | null }) => item.produkId!);
 
             const [products, periodResolved, warehouseResolved] = await Promise.all([
-                tx.produk.findMany({
+                transactionClient.produk.findMany({
                     where: { id: { in: productIds } },
                     include: { persediaan: true }
                 }),
-                tx.periodeAkuntansi.findFirst({
+                transactionClient.periodeAkuntansi.findFirst({
                     where: { perusahaanId, bulan: month, tahun: year, status: 'TERBUKA' }
                 }),
-                validatedData.gudangId ? Promise.resolve({ id: validatedData.gudangId }) : tx.gudang.findFirst({
+                validatedData.gudangId ? Promise.resolve({ id: validatedData.gudangId }) : transactionClient.gudang.findFirst({
                     where: { cabang: { perusahaanId }, isUtama: true }
                 })
             ]);
 
-            const productMap = new Map(products.map(p => [p.id, p]));
+            const productMap = new Map(products.map((product: Prisma.ProdukGetPayload<{ include: { persediaan: true } }>) => [product.id, product]));
             let period = periodResolved;
             let warehouseId = warehouseResolved?.id;
 
             if (!period) {
-                period = await tx.periodeAkuntansi.create({
+                period = await transactionClient.periodeAkuntansi.create({
                     data: {
                         perusahaanId: perusahaanId!,
                         bulan: month,
@@ -67,7 +69,7 @@ export const createInvoice = async (req: Request, res: Response) => {
             }
 
             if (productIds.length > 0 && !warehouseId) {
-                const fallbackWarehouse = await tx.gudang.findFirst({ where: { cabang: { perusahaanId } } });
+                const fallbackWarehouse = await transactionClient.gudang.findFirst({ where: { cabang: { perusahaanId } } });
                 if (!fallbackWarehouse) throw new Error("Gudang tidak ditemukan.");
                 warehouseId = fallbackWarehouse.id;
             }
@@ -76,15 +78,15 @@ export const createInvoice = async (req: Request, res: Response) => {
             let subtotal = 0;
             const inventoryBatchItems: { persediaanId: string, gudangId: string, qty: number }[] = [];
 
-            const detailItems = validatedData.items.map((item, idx) => {
+            const detailItems = validatedData.items.map((item, index) => {
                 const amount = item.kuantitas * item.hargaSatuan - (item.diskon || 0);
                 subtotal += amount;
 
                 if (item.produkId) {
-                    const prod = productMap.get(item.produkId);
-                    if (prod?.persediaanId) {
+                    const product = productMap.get(item.produkId);
+                    if (product?.persediaanId) {
                         inventoryBatchItems.push({
-                            persediaanId: prod.persediaanId,
+                            persediaanId: product.persediaanId,
                             gudangId: warehouseId!,
                             qty: item.kuantitas
                         });
@@ -92,9 +94,9 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
 
                 return {
-                    urutan: idx + 1,
+                    urutan: index + 1,
                     akunId: item.akunId,
-                    deskripsi: item.deskripsi || `Item ${idx + 1}`,
+                    deskripsi: item.deskripsi || `Item ${index + 1}`,
                     kuantitas: item.kuantitas,
                     hargaSatuan: item.hargaSatuan,
                     diskon: item.diskon,
@@ -105,7 +107,7 @@ export const createInvoice = async (req: Request, res: Response) => {
             // 4. Batch Stock Removal & COGS Aggregation
             const inventoryJournalDetails: JournalItem[] = [];
             if (inventoryBatchItems.length > 0) {
-                const cogsResults = await InventoryService.batchRemoveStock(tx as any, inventoryBatchItems, {
+                const cogsResults = await InventoryService.batchRemoveStock(transactionClient, inventoryBatchItems, {
                     refType: 'SALES',
                     refId: invNo,
                     tanggal,
@@ -114,18 +116,18 @@ export const createInvoice = async (req: Request, res: Response) => {
 
                 for (const item of validatedData.items) {
                     if (item.produkId) {
-                        const prod = productMap.get(item.produkId);
-                        const cogs = cogsResults[`${prod?.persediaanId}_${warehouseId}`] || 0;
+                        const product = productMap.get(item.produkId);
+                        const cogs = cogsResults[`${product?.persediaanId}_${warehouseId}`] || 0;
 
-                        if (prod?.persediaan?.akunHppId && prod?.persediaan?.akunPersediaanId) {
+                        if (product?.persediaan?.akunHppId && product?.persediaan?.akunPersediaanId) {
                             inventoryJournalDetails.push({
-                                akunId: prod.persediaan.akunHppId,
+                                akunId: product.persediaan.akunHppId,
                                 deskripsi: `HPP - ${item.deskripsi}`,
                                 debit: cogs,
                                 kredit: 0
                             });
                             inventoryJournalDetails.push({
-                                akunId: prod.persediaan.akunPersediaanId,
+                                akunId: product.persediaan.akunPersediaanId,
                                 deskripsi: `Persediaan - ${item.deskripsi}`,
                                 debit: 0,
                                 kredit: cogs
@@ -138,15 +140,16 @@ export const createInvoice = async (req: Request, res: Response) => {
             const total = subtotal;
 
             // 5. Create Transaksi
-            const transaksi = await tx.transaksi.create({
+            const transaksi = await transactionClient.transaksi.create({
                 data: {
                     perusahaanId: perusahaanId!,
-                    penggunaId: authReq.user.id,
+                    penggunaId: authReq.user!.id,
                     nomorTransaksi: invNo,
                     tanggal,
                     tanggalJatuhTempo: jatuhTempo,
                     termPembayaran: validatedData.terminPembayaran,
                     tipe: 'PENJUALAN',
+                    cabangId: validatedData.cabangId,
                     deskripsi: validatedData.catatan || `Invoice ${invNo}`,
                     referensi: validatedData.referensi,
                     subtotal,
@@ -156,7 +159,7 @@ export const createInvoice = async (req: Request, res: Response) => {
                     pelangganId: validatedData.pelangganId,
                     isPosted: true,
                     postedAt: new Date(),
-                    postedBy: authReq.user.username,
+                    postedBy: authReq.user!.username,
                     detail: {
                         create: detailItems.map(item => ({
                             urutan: item.urutan,
@@ -172,7 +175,7 @@ export const createInvoice = async (req: Request, res: Response) => {
             });
 
             // 6. Piutang & Voucher
-            await tx.piutang.create({
+            await transactionClient.piutang.create({
                 data: {
                     perusahaanId: perusahaanId!,
                     pelangganId: validatedData.pelangganId,
@@ -187,26 +190,27 @@ export const createInvoice = async (req: Request, res: Response) => {
                 }
             });
 
-            const voucher = await tx.voucher.create({
+            const voucher = await transactionClient.voucher.create({
                 data: {
                     perusahaanId: perusahaanId!,
                     transaksiId: transaksi.id,
                     nomorVoucher: `VCH-${invNo}`,
                     tanggal,
                     tipe: 'JURNAL_UMUM',
+                    cabangId: validatedData.cabangId,
                     deskripsi: `Penjualan ${invNo}`,
                     totalDebit: total,
                     totalKredit: total,
                     status: 'DIPOSTING',
-                    dibuatOlehId: authReq.user.id,
+                    dibuatOlehId: authReq.user!.id,
                     isPosted: true,
                     postedAt: new Date(),
-                    postedBy: authReq.user.username
+                    postedBy: authReq.user!.username
                 }
             });
 
             // 7. ACCOUNT UPDATES (BATCH RESOLUTION)
-            const arAccount = await tx.chartOfAccounts.findFirst({
+            const arAccount = await transactionClient.chartOfAccounts.findFirst({
                 where: { perusahaanId, tipe: 'ASET', kategoriAset: 'PIUTANG_USAHA' }
             });
             if (!arAccount) throw new Error('Akun Piutang Usaha tidak ditemukan');
@@ -223,14 +227,15 @@ export const createInvoice = async (req: Request, res: Response) => {
                     kredit: item.subtotal
                 }))
             ];
-            await tx.voucherDetail.createMany({ data: voucherDetailsData });
+            await transactionClient.voucherDetail.createMany({ data: voucherDetailsData });
 
             // Jurnal Umum
-            await tx.jurnalUmum.create({
+            await transactionClient.jurnalUmum.create({
                 data: {
                     perusahaanId: perusahaanId!,
                     periodeId: period.id,
                     voucherId: voucher.id,
+                    cabangId: validatedData.cabangId,
                     nomorJurnal: `GL-${invNo}`,
                     tanggal,
                     deskripsi: `Penjualan ${invNo}`,
@@ -284,9 +289,9 @@ export const createInvoice = async (req: Request, res: Response) => {
 
             // Commit all balance updates in individual optimized queries (Prisma doesn't batch updates well by ID)
             // But we filter by unique ID to avoid redundant hits.
-            for (const [accId, amount] of Object.entries(balanceUpdates)) {
-                await tx.chartOfAccounts.update({
-                    where: { id: accId },
+            for (const [accountId, amount] of Object.entries(balanceUpdates)) {
+                await transactionClient.chartOfAccounts.update({
+                    where: { id: accountId },
                     data: { saldoBerjalan: { increment: amount } }
                 });
             }
@@ -320,7 +325,7 @@ export const getInvoices = async (req: Request, res: Response) => {
         };
 
         if (status) {
-            where.statusPembayaran = status;
+            where.statusPembayaran = status as StatusPembayaran;
         }
 
         if (search) {
@@ -392,7 +397,7 @@ export const generateInvoicePDF = async (req: Request, res: Response) => {
         const { id } = req.params;
         const authReq = req as AuthRequest;
 
-        const invoice: any = await prisma.transaksi.findUnique({
+        const invoice = await prisma.transaksi.findUnique({
             where: { id: String(id), perusahaanId: authReq.currentCompanyId },
             include: {
                 pelanggan: true,
@@ -465,7 +470,7 @@ export const generateInvoicePDF = async (req: Request, res: Response) => {
         doc.fillColor(primaryColor).font('Helvetica');
 
         // --- ITEMS ---
-        invoice.detail.forEach((item: any, index: number) => {
+        invoice!.detail.forEach((item, index: number) => {
             if (tableY > 700) {
                 doc.addPage();
                 tableY = 50;
@@ -546,16 +551,25 @@ export const getAgingSchedule = async (req: Request, res: Response) => {
         });
 
         const today = new Date();
-        const customerAging: Record<string, any> = {};
+        const customerAging: Record<string, {
+            pelangganId: string,
+            pelangganNama: string,
+            current: number,
+            days1_30: number,
+            days31_60: number,
+            days61_90: number,
+            days90plus: number,
+            total: number
+        }> = {};
 
-        for (const p of piutangs) {
+        for (const piutang of piutangs) {
             // Safe check for relation
-            if (!p.pelanggan) continue;
+            if (!piutang.pelanggan) continue;
 
-            const daysOverdue = differenceInDays(today, new Date(p.tanggalJatuhTempo));
-            const amount = Number(p.sisaPiutang);
-            const customerId = p.pelangganId;
-            const customerName = p.pelanggan.nama;
+            const daysOverdue = differenceInDays(today, new Date(piutang.tanggalJatuhTempo));
+            const amount = Number(piutang.sisaPiutang);
+            const customerId = piutang.pelangganId;
+            const customerName = piutang.pelanggan.nama;
 
             if (!customerAging[customerId]) {
                 customerAging[customerId] = {

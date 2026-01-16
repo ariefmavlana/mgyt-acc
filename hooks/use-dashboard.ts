@@ -1,6 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/api';
 
 export interface DashboardStats {
     revenue: number;
@@ -17,11 +17,13 @@ export interface DashboardStats {
     } | null;
 }
 
-export function useDashboard() {
+export function useDashboard(cabangId?: string) {
     return useQuery({
-        queryKey: ['dashboard-stats'],
+        queryKey: ['dashboard-stats', cabangId],
         queryFn: async () => {
-            const { data } = await axios.get<DashboardStats>('/api/dashboard/stats');
+            const { data } = await api.get<DashboardStats>('/dashboard/stats', {
+                params: { cabangId }
+            });
             return data;
         }
     });

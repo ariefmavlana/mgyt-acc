@@ -127,7 +127,7 @@ export const createTransaction = async (req: Request, res: Response) => {
             const pajaks = await tx.masterPajak.findMany({
                 where: { id: { in: pajakIds } }
             });
-            const taxMap = new Map(pajaks.map(t => [t.id, t]));
+            const taxMap = new Map<string, typeof pajaks[0]>(pajaks.map(t => [t.id, t]));
 
             const processedItems = validatedData.items.map((item, index) => {
                 const baseAmount = item.debit > 0 ? item.debit : item.kredit;
@@ -181,6 +181,7 @@ export const createTransaction = async (req: Request, res: Response) => {
                     nomorTransaksi: transNo,
                     tanggal: date,
                     tipe: validatedData.tipe as TipeTransaksi,
+                    cabangId: validatedData.cabangId,
                     deskripsi: validatedData.deskripsi,
                     referensi: validatedData.referensi,
                     subtotal: totalAmount,
@@ -245,6 +246,9 @@ export const createTransaction = async (req: Request, res: Response) => {
             const finalTotalDebit = finalVoucherItems.reduce((sum, i) => sum + i.debit, 0);
             const finalTotalKredit = finalVoucherItems.reduce((sum, i) => sum + i.kredit, 0);
 
+            // 5b. Validate Balance Integrity (PSAK)
+            engine.validateJournal(finalVoucherItems);
+
             // 6. Create Voucher
             const voucher = await tx.voucher.create({
                 data: {
@@ -253,6 +257,7 @@ export const createTransaction = async (req: Request, res: Response) => {
                     nomorVoucher: voucherNo,
                     tanggal: date,
                     tipe: 'JURNAL_UMUM',
+                    cabangId: validatedData.cabangId,
                     deskripsi: validatedData.deskripsi,
                     totalDebit: finalTotalDebit,
                     totalKredit: finalTotalKredit,
@@ -280,6 +285,7 @@ export const createTransaction = async (req: Request, res: Response) => {
                     perusahaanId,
                     periodeId: period.id,
                     voucherId: voucher.id,
+                    cabangId: validatedData.cabangId,
                     nomorJurnal: journalNo,
                     tanggal: date,
                     deskripsi: validatedData.deskripsi,
@@ -390,7 +396,7 @@ export const voidTransaction = async (req: Request, res: Response) => {
         const authReq = req as AuthRequest;
         const id = req.params.id as string;
         const perusahaanId = authReq.currentCompanyId!;
-        const reason = req.body.reason || 'Voided by user';
+        const reason = req.body?.reason || 'Voided by user';
 
         const result = await prisma.$transaction(async (tx) => {
             const engine = new AccountingEngine(tx as any);
@@ -420,8 +426,8 @@ export const voidTransaction = async (req: Request, res: Response) => {
                 throw new Error('Transaksi sudah dibatalkan sebelumnya');
             }
 
-            // Check period
-            await engine.validatePeriod(perusahaanId, transaction.tanggal);
+            // Check if current period is open for reversal journal
+            await engine.validatePeriod(perusahaanId, new Date());
 
             // 2. Mark as void
             const updatedTransaction = await tx.transaksi.update({
@@ -444,6 +450,7 @@ export const voidTransaction = async (req: Request, res: Response) => {
                         perusahaanId,
                         periodeId: originalJournal.periodeId,
                         voucherId: transaction.voucher.id,
+                        cabangId: transaction.cabangId,
                         nomorJurnal: reversalJournalNo,
                         tanggal: new Date(),
                         deskripsi: `Pembalikan transaksi ${transaction.nomorTransaksi}: ${transaction.deskripsi}`,
@@ -460,7 +467,7 @@ export const voidTransaction = async (req: Request, res: Response) => {
                 const reversalAccounts = await tx.chartOfAccounts.findMany({
                     where: { id: { in: reversalAccountIds } }
                 });
-                const reversalAccountMap = new Map(reversalAccounts.map(a => [a.id, a]));
+                const reversalAccountMap = new Map<string, typeof reversalAccounts[0]>(reversalAccounts.map(a => [a.id, a]));
                 const reversalBalanceUpdates: Record<string, number> = {};
 
                 for (const [index, jd] of originalJournalDetail.entries()) {

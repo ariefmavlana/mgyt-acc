@@ -50,33 +50,35 @@ async function main() {
     for (const [roleName, permissions] of Object.entries(ROLES_DEFINITIONS)) {
         console.log(`Processing Role: ${roleName}`);
 
-        // Upsert System Role
-        await prisma.role.upsert({
+        const existingRole = await prisma.role.findFirst({
             where: {
-                companyId_name: {
-                    companyId: 'SYSTEM', // Using a placeholder or null if unique constraint allows
-                    // Actually unique is [companyId, name]. If companyId is nullable, this might be tricky in Prisma upsert.
-                    // Let's assume we want Global System Roles where companyId is NULL?
-                    // Prisma unique constraint on nullable fields treats each null as unique or same depending on DB.
-                    // But usually unique index allows only one (null, 'ADMIN').
-
-                    // Workaround: We'll try to find first.
-                    name: roleName
-                } as any
-            },
-            update: {
-                permissions: permissions as Permission[]
-            },
-            create: {
                 name: roleName,
-                displayName: roleName.charAt(0) + roleName.slice(1).toLowerCase().replace('_', ' '),
-                description: `System Default Role for ${roleName}`,
-                isSystemRole: true,
-                companyId: null, // System Role
-                permissions: permissions as Permission[],
-                level: roleName === 'SUPERADMIN' ? 0 : 5
+                companyId: null
             }
         });
+
+        if (existingRole) {
+            await prisma.role.update({
+                where: { id: existingRole.id },
+                data: {
+                    permissions: permissions as Permission[]
+                }
+            });
+            console.log(`Updated Role: ${roleName}`);
+        } else {
+            await prisma.role.create({
+                data: {
+                    name: roleName,
+                    displayName: roleName.charAt(0) + roleName.slice(1).toLowerCase().replace('_', ' '),
+                    description: `System Default Role for ${roleName}`,
+                    isSystemRole: true,
+                    companyId: null,
+                    permissions: permissions as Permission[],
+                    level: roleName === 'SUPERADMIN' ? 0 : 5
+                }
+            });
+            console.log(`Created Role: ${roleName}`);
+        }
     }
 
     console.log('✅ Roles seeded successfully.');

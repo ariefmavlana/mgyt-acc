@@ -13,7 +13,15 @@ import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
 import { PeriodSettings } from '@/components/settings/period-settings';
 import { UsersTable } from '@/components/settings/users-table';
+import { BranchSettings } from '@/components/settings/branch-settings';
 import { FileUpload } from '@/components/ui/file-upload';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 export default function SettingsPage() {
     useRequireAuth('/login', ['SUPERADMIN', 'ADMIN']);
@@ -35,7 +43,8 @@ export default function SettingsPage() {
 
     const [systemForm, setSystemForm] = useState({
         mataUangUtama: 'IDR',
-        tahunBuku: 12
+        tahunBuku: 12,
+        bulanMulaiFiskal: 1
     });
 
     useEffect(() => {
@@ -52,7 +61,8 @@ export default function SettingsPage() {
 
             setSystemForm({
                 mataUangUtama: company.mataUangUtama || 'IDR',
-                tahunBuku: company.tahunBuku || 12
+                tahunBuku: company.tahunBuku || 12,
+                bulanMulaiFiskal: company.bulanMulaiFiskal || 1
             });
         }
     }, [company]);
@@ -108,6 +118,7 @@ export default function SettingsPage() {
             <Tabs defaultValue={defaultTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-5 lg:w-[750px] mb-8">
                     <TabsTrigger value="company">Profil Perusahaan</TabsTrigger>
+                    <TabsTrigger value="branches">Cabang</TabsTrigger>
                     <TabsTrigger value="users">Pengguna</TabsTrigger>
                     <TabsTrigger value="periods">Periode</TabsTrigger>
                     <TabsTrigger value="security">Keamanan</TabsTrigger>
@@ -179,6 +190,11 @@ export default function SettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* Branches Tab */}
+                <TabsContent value="branches">
+                    <BranchSettings />
                 </TabsContent>
 
                 {/* Users Tab */}
@@ -274,6 +290,31 @@ export default function SettingsPage() {
                                         onChange={(e) => setSystemForm({ ...systemForm, tahunBuku: parseInt(e.target.value) })}
                                         className="bg-white"
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="bulanMulaiFiskal">Bulan Mulai Fiskal</Label>
+                                    <Select
+                                        value={systemForm.bulanMulaiFiskal?.toString()}
+                                        onValueChange={(val) => setSystemForm({ ...systemForm, bulanMulaiFiskal: parseInt(val) })}
+                                    >
+                                        <SelectTrigger className="bg-white">
+                                            <SelectValue placeholder="Pilih Bulan" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">Januari</SelectItem>
+                                            <SelectItem value="2">Februari</SelectItem>
+                                            <SelectItem value="3">Maret</SelectItem>
+                                            <SelectItem value="4">April</SelectItem>
+                                            <SelectItem value="5">Mei</SelectItem>
+                                            <SelectItem value="6">Juni</SelectItem>
+                                            <SelectItem value="7">Juli</SelectItem>
+                                            <SelectItem value="8">Agustus</SelectItem>
+                                            <SelectItem value="9">September</SelectItem>
+                                            <SelectItem value="10">Oktober</SelectItem>
+                                            <SelectItem value="11">November</SelectItem>
+                                            <SelectItem value="12">Desember</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                             <div className="flex justify-end pt-4">

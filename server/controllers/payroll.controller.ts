@@ -49,7 +49,7 @@ export const processPayroll = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
         const { period, employeeId, tanggalBayar } = calculatePayrollSchema.parse(req.body);
 
-        const where: Prisma.KaryawanWhereInput = { perusahaanId, status: 'AKTIF' };
+        const where: Prisma.KaryawanWhereInput = { status: 'AKTIF' };
         if (employeeId) where.id = employeeId;
 
         const employees = await prisma.karyawan.findMany({ where });
@@ -138,9 +138,7 @@ export const getPayrollHistory = async (req: Request, res: Response) => {
         const perusahaanId = authReq.currentCompanyId!;
         const { period } = req.query;
 
-        const where: Prisma.PenggajianWhereInput = {
-            perusahaanId
-        };
+        const where: Prisma.PenggajianWhereInput = {};
         if (period) where.periode = period as string;
 
         const history = await prisma.penggajian.findMany({
@@ -168,7 +166,6 @@ export const postPayrollToJournal = async (req: Request, res: Response) => {
 
         const payrolls = await prisma.penggajian.findMany({
             where: {
-                perusahaanId,
                 periode: period,
                 sudahDijurnal: false
             }

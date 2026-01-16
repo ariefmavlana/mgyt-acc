@@ -25,9 +25,7 @@ import {
     ChevronRight,
     FolderTree,
     Package,
-    ArrowRightLeft,
     Box,
-    Warehouse,
     Receipt,
     TrendingUp,
     FileSignature,
@@ -36,7 +34,10 @@ import {
     HelpCircle,
     Percent,
     PieChart,
-    RefreshCw
+    RefreshCw,
+    BarChart2,
+    Target,
+    LayoutGrid
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -55,54 +56,50 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             title: '',
             items: [
                 { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-                { name: 'Perusahaan', href: '/dashboard/companies', icon: Building2 },
             ]
         },
         {
-            title: 'Penjualan',
-            items: [
-                { name: 'Faktur Penjualan', href: '/dashboard/invoices', icon: FileText },
-                { name: 'Monitor Piutang', href: '/dashboard/ar-dashboard', icon: TrendingUp },
-            ]
-        },
-        {
-            title: 'Pembelian',
-            items: [
-                { name: 'Tagihan Pembelian', href: '/dashboard/bills', icon: Receipt },
-            ]
-        },
-        {
-            title: 'Persediaan',
-            items: [
-                { name: 'Produk', href: '/dashboard/products', icon: Box },
-                { name: 'Gudang', href: '/dashboard/inventory/warehouses', icon: Warehouse },
-                { name: 'Stok Gudang', href: '/dashboard/inventory', icon: Package },
-                { name: 'Transfer Stok', href: '/dashboard/inventory/transfer', icon: ArrowRightLeft },
-            ]
-        },
-        {
-            title: 'Keuangan',
+            title: 'Akuntansi & Keuangan',
             items: [
                 { name: 'Buku Besar', href: '/dashboard/coa', icon: FolderTree },
                 { name: 'Voucher / Kas', href: '/dashboard/transactions', icon: FileText },
-                { name: 'Anggaran', href: '/dashboard/budget', icon: PieChart },
-                { name: 'Aset Tetap', href: '/dashboard/assets', icon: Box },
+                { name: 'Laporan Keuangan', href: '/dashboard/reports', icon: BarChart2 },
                 { name: 'Master Pajak', href: '/dashboard/tax', icon: Percent },
+                { name: 'Aset Tetap', href: '/dashboard/assets', icon: Box },
+                { name: 'Anggaran', href: '/dashboard/budget', icon: PieChart },
+            ]
+        },
+        {
+            title: 'Operasional',
+            items: [
+                { name: 'Penjualan (AR)', href: '/dashboard/invoices', icon: TrendingUp },
+                { name: 'Pembelian (AP)', href: '/dashboard/bills', icon: Receipt },
+                { name: 'Persediaan', href: '/dashboard/inventory', icon: Package },
+                { name: 'Produk', href: '/dashboard/products', icon: Box },
+            ]
+        },
+        {
+            title: 'Organisasi',
+            items: [
+                { name: 'Cost Center', href: '/dashboard/organization/cost-centers', icon: Target },
+                { name: 'Profit Center', href: '/dashboard/organization/profit-centers', icon: TrendingUp },
+                { name: 'Cabang', href: '/dashboard/settings?tab=branches', icon: Building2 },
+                { name: 'Departemen', href: '/dashboard/hr/departments', icon: Building2 },
+                { name: 'Proyek', href: '/dashboard/organization/projects', icon: LayoutGrid },
             ]
         },
         {
             title: 'SDM & Gaji',
             items: [
                 { name: 'Karyawan', href: '/dashboard/employees', icon: Users },
-                { name: 'Departemen', href: '/dashboard/hr/departments', icon: Building2 },
                 { name: 'Kontrak Kerja', href: '/dashboard/contracts', icon: FileSignature },
                 { name: 'Penggajian', href: '/dashboard/hr/payroll', icon: Banknote },
             ]
         },
         {
-            title: 'Sistem',
+            title: 'Sistem & Perusahaan',
             items: [
-                { name: 'Laporan', href: '/dashboard/reports', icon: FileText },
+                { name: 'Profil Perusahaan', href: '/dashboard/companies', icon: Building2 },
                 { name: 'Audit Trail', href: '/dashboard/audit', icon: Activity },
                 { name: 'Transaksi Berulang', href: '/dashboard/system/recurring', icon: RefreshCw },
                 { name: 'Pengaturan', href: '/dashboard/settings', icon: Settings },
@@ -110,6 +107,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ]
         }
     ];
+
+    const filteredMenuGroups = menuGroups.map(group => ({
+        ...group,
+        items: group.items.filter(item => {
+            // Basic role filtering
+            if (user?.role === 'STAFF' || user?.role === 'VIEWER') {
+                if (['Settings', 'Audit Trail', 'Profil Perusahaan', 'Pengaturan'].includes(item.name)) return false;
+            }
+            return true;
+        })
+    })).filter(group => group.items.length > 0);
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -124,7 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="min-h-screen bg-slate-50 flex">
             {/* Sidebar */}
             <aside className={cn(
-                "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-50",
+                "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-50 h-screen sticky top-0",
                 isSidebarOpen ? "w-64" : "w-20"
             )}>
                 <div className="h-16 flex items-center px-6 border-b border-slate-100">
@@ -140,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 <div className="flex-1 py-6 overflow-y-auto overflow-x-hidden">
                     <nav className="px-3 space-y-6">
-                        {menuGroups.map((group, groupIndex) => (
+                        {filteredMenuGroups.map((group, groupIndex) => (
                             <div key={groupIndex}>
                                 {isSidebarOpen && group.title && (
                                     <div className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -249,7 +257,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <main className="flex-1 min-w-0">
                     {children}
                 </main>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 }

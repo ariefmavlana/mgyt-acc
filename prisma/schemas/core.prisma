@@ -80,6 +80,7 @@ model Perusahaan {
     logo             String?
     mataUangUtama    String  @default("IDR")
     tahunBuku        Int     @default(12)
+    bulanMulaiFiskal Int     @default(1) // 1 = Januari
     satuanUsahaKecil Boolean @default(false)
 
     induk   Perusahaan?  @relation("GrupPerusahaan", fields: [indukId], references: [id])
@@ -125,7 +126,7 @@ model Perusahaan {
     dashboardWidgets     DashboardWidget[]
     perusahaanPakets     PerusahaanPaket[]
     dokumenTransaksi     DokumenTransaksi[]
-    payrolls             Penggajian[]
+    payrolls             Penggajian[]          @relation("PerusahaanPayrolls")
     proyekTransaksis     ProyekTransaksi[]
 
     @@index([kode])
@@ -141,6 +142,10 @@ model PengaturanPerusahaan {
     metodeInventory  MetodePenilaianPersediaan @default(RATA_RATA_BERGERAK)
     metodePenyusutan MetodePenyusutan          @default(GARIS_LURUS)
     metodAmortisasi  MetodePenyusutan          @default(GARIS_LURUS)
+
+    // Akun Linkage untuk Closing (PSAK)
+    akunLabaTahunBerjalanId String?
+    akunLabaDitahanId       String?
 
     batasKreditDefault    Decimal @default(0) @db.Decimal(18, 2)
     termPembayaranDefault Int     @default(30)
@@ -201,6 +206,8 @@ model Cabang {
 
     aksesPengguna AksesPengguna[]
     transaksi     Transaksi[]
+    vouchers      Voucher[]
+    jurnals       JurnalUmum[]
     gudang        Gudang[]
 
     createdAt DateTime @default(now())

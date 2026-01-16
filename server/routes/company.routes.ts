@@ -8,6 +8,9 @@ import {
     updateSettings,
     getWarehouses,
     getBranches,
+    createBranch,
+    updateBranch,
+    deleteBranch,
     getCompanyUsers,
     addUserToCompany,
     removeUserFromCompany
@@ -21,6 +24,9 @@ router.use(protect); // All company routes are protected
 router.get('/', getCompanies);
 router.get('/warehouses', getWarehouses);
 router.get('/branches', getBranches);
+router.post('/branches', createBranch);
+router.put('/branches/:branchId', updateBranch);
+router.delete('/branches/:branchId', deleteBranch);
 router.get('/:id', getCompany);
 router.post('/', createCompany);
 router.put('/:id', updateCompany);

@@ -240,6 +240,9 @@ model Voucher {
     tanggal      DateTime
     tipe         TipeVoucher
 
+    cabang   Cabang? @relation(fields: [cabangId], references: [id])
+    cabangId String?
+
     transaksi   Transaksi? @relation(fields: [transaksiId], references: [id])
     transaksiId String?    @unique
 
@@ -283,6 +286,7 @@ model Voucher {
 
     @@unique([perusahaanId, nomorVoucher])
     @@index([perusahaanId, tanggal])
+    @@index([perusahaanId, cabangId])
     @@index([status])
     @@index([tipe])
 }
@@ -325,6 +329,9 @@ model JurnalUmum {
     voucher   Voucher? @relation(fields: [voucherId], references: [id])
     voucherId String?
 
+    cabang   Cabang? @relation(fields: [cabangId], references: [id])
+    cabangId String?
+
     nomorJurnal String
     tanggal     DateTime
 
@@ -346,6 +353,7 @@ model JurnalUmum {
 
     @@unique([perusahaanId, nomorJurnal])
     @@index([perusahaanId, tanggal])
+    @@index([perusahaanId, cabangId])
     @@index([periodeId])
 }
 

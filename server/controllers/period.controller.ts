@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
+import { AccountingEngine } from '../lib/accounting-engine';
 
 export const getPeriods = async (req: Request, res: Response) => {
     try {
@@ -25,9 +27,9 @@ export const closePeriod = async (req: Request, res: Response) => {
         const id = req.params.id;
         const perusahaanId = authReq.currentCompanyId!;
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (transactionClient: Prisma.TransactionClient) => {
             // 1. Find period
-            const period = await tx.periodeAkuntansi.findUnique({
+            const period = await transactionClient.periodeAkuntansi.findUnique({
                 where: { id: id as string, perusahaanId }
             });
 
@@ -36,7 +38,7 @@ export const closePeriod = async (req: Request, res: Response) => {
 
             // 2. Check for unposted entries (vouchers/transactions)
             // In this strict engine, transactions are auto-posted, so we check if any are DRAFT
-            const unpostedVouchers = await tx.voucher.count({
+            const unpostedVouchers = await transactionClient.voucher.count({
                 where: {
                     perusahaanId,
                     tanggal: {
@@ -51,19 +53,19 @@ export const closePeriod = async (req: Request, res: Response) => {
                 throw new Error(`Gagal menutup periode: Terdapat ${unpostedVouchers} voucher yang masih status DRAFT.`);
             }
 
-            // 3. Update Period status
-            const updatedPeriod = await tx.periodeAkuntansi.update({
+            // 3. Perform Closing Journal Entries (PSAK)
+            const engine = new AccountingEngine(transactionClient);
+            await engine.performClosing(perusahaanId, id as string, authReq.user!.username);
+
+            // 4. Update Period status
+            const updatedPeriod = await transactionClient.periodeAkuntansi.update({
                 where: { id: id as string },
                 data: {
                     status: 'DITUTUP_PERMANEN',
-                    ditutupOleh: authReq.user.username,
+                    ditutupOleh: authReq.user!.username,
                     tanggalDitutup: new Date()
                 }
             });
-
-            // 4. Record Carry forward (Historical tracking)
-            // For now, COA balances are real-time, so closing doesn't 'shift' balances, 
-            // but it locks entries for that date range in createTransaction.
 
             return updatedPeriod;
         });

@@ -138,7 +138,7 @@ export const getTaxReport = async (req: Request, res: Response) => {
         });
 
         // Summary by type
-        const summary = taxTransactions.reduce((acc: Record<string, { totalDasar: number, totalPajak: number, count: number }>, curr: any) => {
+        const summary = taxTransactions.reduce((acc: Record<string, { totalDasar: number, totalPajak: number, count: number }>, curr: Prisma.TransaksiPajakGetPayload<{ include: { pajak: true } }>) => {
             const jenis = curr.pajak.jenis as string;
             if (!acc[jenis]) {
                 acc[jenis] = {
@@ -160,5 +160,77 @@ export const getTaxReport = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error generating tax report:', error);
         res.status(500).json({ message: 'Gagal membuat laporan pajak' });
+    }
+};
+
+export const fileTaxReport = async (req: Request, res: Response) => {
+    try {
+        const { perusahaanId, jenisPajak, masaPajak, tahunPajak, dpp, pajak, nomorBuktiPenerimaan, dokumen } = req.body;
+
+        if (!perusahaanId || !jenisPajak || !masaPajak || !tahunPajak) {
+            return res.status(400).json({ message: 'Data laporan pajak tidak lengkap' });
+        }
+
+        const report = await prisma.laporanPajak.upsert({
+            where: {
+                perusahaanId_jenisPajak_masaPajak_tahunPajak: {
+                    perusahaanId,
+                    jenisPajak,
+                    masaPajak,
+                    tahunPajak
+                }
+            },
+            create: {
+                perusahaanId,
+                jenisPajak,
+                masaPajak,
+                tahunPajak,
+                dpp: dpp || 0,
+                pajak: pajak || 0,
+                nomorBuktiPenerimaan,
+                dokumen,
+                statusLaporan: 'FILED',
+                tanggalLapor: new Date()
+            },
+            update: {
+                dpp: dpp || 0,
+                pajak: pajak || 0,
+                nomorBuktiPenerimaan,
+                dokumen,
+                statusLaporan: 'FILED',
+                tanggalLapor: new Date()
+            }
+        });
+
+        res.status(201).json(report);
+    } catch (error) {
+        console.error('Error filing tax report:', error);
+        res.status(500).json({ message: 'Gagal melakukan pelaporan pajak' });
+    }
+};
+
+export const getFiledTaxReports = async (req: Request, res: Response) => {
+    try {
+        const { perusahaanId, tahun } = req.query;
+
+        if (!perusahaanId) {
+            return res.status(400).json({ message: 'Perusahaan ID diperlukan' });
+        }
+
+        const reports = await prisma.laporanPajak.findMany({
+            where: {
+                perusahaanId: perusahaanId as string,
+                tahunPajak: tahun ? parseInt(tahun as string) : undefined
+            },
+            orderBy: [
+                { tahunPajak: 'desc' },
+                { masaPajak: 'desc' }
+            ]
+        });
+
+        res.json(reports);
+    } catch (error) {
+        console.error('Error fetching filed tax reports:', error);
+        res.status(500).json({ message: 'Gagal mengambil history laporan pajak' });
     }
 };

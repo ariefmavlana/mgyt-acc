@@ -27,20 +27,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import {
-    LayoutGrid,
-    Tag,
-    Layers,
-    Anchor,
-    DollarSign,
-    StickyNote,
-    Settings,
-    Building2,
-    Briefcase
-} from 'lucide-react';
 import { createCOASchema } from '@/server/validators/coa.validator';
 import { TipeAkun } from '@prisma/client';
 import { cn } from '@/lib/utils';
+import api from '@/lib/api';
+import { toast } from 'sonner';
+import { RefreshCw, LayoutGrid, Tag, Layers, Anchor, DollarSign, StickyNote, Settings, Building2, Briefcase } from 'lucide-react';
 
 type AccountFormData = z.infer<typeof createCOASchema>;
 
@@ -67,6 +59,27 @@ export function AccountForm({ initialData, parents, onSubmit, isLoading }: Accou
             catatan: initialData?.catatan || '',
         },
     });
+
+    const parentId = form.watch('parentId');
+    const [isGenerating, setIsGenerating] = React.useState(false);
+
+    const handleAutoGenerateCode = async () => {
+        try {
+            setIsGenerating(true);
+            const res = await api.get('/coa/next-code', {
+                params: { parentId: parentId || undefined }
+            });
+            if (res.data.nextCode) {
+                form.setValue('kodeAkun', res.data.nextCode);
+                toast.success('Nomor akun dihasilkan otomatis');
+            }
+        } catch (error) {
+            console.error('Failed to generate next code:', error);
+            toast.error('Gagal menghasilkan nomor akun otomatis');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     const getTypeColor = (type: string) => {
         switch (type) {
@@ -97,10 +110,23 @@ export function AccountForm({ initialData, parents, onSubmit, isLoading }: Accou
                                         name="kodeAkun"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="flex items-center gap-1.5">
-                                                    <Tag className="w-3.5 h-3.5 text-slate-400" />
-                                                    Kode Akun
-                                                </FormLabel>
+                                                <div className="flex items-center justify-between">
+                                                    <FormLabel className="flex items-center gap-1.5">
+                                                        <Tag className="w-3.5 h-3.5 text-slate-400" />
+                                                        Kode Akun
+                                                    </FormLabel>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={handleAutoGenerateCode}
+                                                        className="h-6 text-[10px] uppercase font-bold tracking-tighter text-primary hover:text-primary/80 px-1"
+                                                        disabled={isGenerating}
+                                                    >
+                                                        {isGenerating ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                                                        Auto
+                                                    </Button>
+                                                </div>
                                                 <FormControl>
                                                     <Input placeholder="1-1001" {...field} className="bg-white" />
                                                 </FormControl>

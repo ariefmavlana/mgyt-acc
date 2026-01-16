@@ -24,6 +24,8 @@ export const createBudgetSchema = z.object({
 
 export const updateBudgetSchema = createBudgetSchema.partial().extend({
     status: z.nativeEnum(StatusBudget).optional(),
+    alasanRevisi: z.string().optional(),
+    catatanRevisi: z.string().optional(),
 });
 
 export const budgetQuerySchema = z.object({

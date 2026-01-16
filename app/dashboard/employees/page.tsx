@@ -34,22 +34,22 @@ export default function EmployeesPage() {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const debouncedSearch = useDebounce(searchTerm, 500);
 
-    const { useEmployees } = useHR();
+    const { useEmployees, useDepartments } = useHR();
     const { data: employees, isLoading, isError } = useEmployees({
         search: debouncedSearch,
         department: departmentFilter,
         status: statusFilter
     });
+    const { data: allDepartments } = useDepartments();
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-    // Get unique departments for the filter dropdown
-    const departments = useMemo(() => {
-        if (!employees) return [];
-        const unique = Array.from(new Set(employees.map(e => e.departemen))).filter(Boolean);
-        return unique.sort();
-    }, [employees]);
+    // Get departments for the filter dropdown
+    const departmentsList = useMemo(() => {
+        if (!allDepartments) return [];
+        return allDepartments.map(d => d.nama).sort();
+    }, [allDepartments]);
 
     const handleExport = async () => {
         try {
@@ -148,7 +148,7 @@ export default function EmployeesPage() {
                             <DropdownMenuSeparator />
                             <DropdownMenuRadioGroup value={departmentFilter} onValueChange={setDepartmentFilter}>
                                 <DropdownMenuRadioItem value="ALL" className="text-sm font-medium">Semua Departemen</DropdownMenuRadioItem>
-                                {departments.map((dept) => (
+                                {departmentsList.map((dept) => (
                                     <DropdownMenuRadioItem key={dept} value={dept} className="text-sm">
                                         {dept}
                                     </DropdownMenuRadioItem>

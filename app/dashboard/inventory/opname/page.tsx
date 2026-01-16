@@ -22,37 +22,53 @@ interface ProductStock {
     gudangId: string;
     kuantitas: number;
     persediaan: {
+        id: string;
         kodePersediaan: string;
         namaPersediaan: string;
         satuan: string;
         produk?: {
             id: string;
+            namaProduk: string;
         };
     };
     gudang: {
+        id: string;
         nama: string;
+        kode: string;
     }
+}
+
+interface Account {
+    id: string;
+    namaAkun: string;
+    kodeAkun: string;
 }
 
 export default function StockOpnamePage() {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [stocks, setStocks] = useState<ProductStock[]>([]);
     const [opnameItems, setOpnameItems] = useState<Record<string, number>>({}); // stockId -> actualQty
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        const fetchWarehouses = async () => {
+        const loadInitialData = async () => {
             try {
-                const res = await api.get('/inventory/warehouses');
-                setWarehouses(res.data);
+                const [whRes, accRes] = await Promise.all([
+                    api.get('/inventory/warehouses'),
+                    api.get('/coa?flatten=true')
+                ]);
+                setWarehouses(whRes.data);
+                setAccounts(accRes.data);
             } catch (error) {
-                console.error('Failed to fetch warehouses', error);
-                toast.error('Gagal memuat data gudang');
+                console.error('Failed to load initial data', error);
+                toast.error('Gagal memuat data pendukung');
             }
         };
-        fetchWarehouses();
+        loadInitialData();
     }, []);
 
     useEffect(() => {
@@ -74,7 +90,7 @@ export default function StockOpnamePage() {
                 initialOpname[s.id] = Number(s.kuantitas);
             });
             setOpnameItems(initialOpname);
-        } catch (error) {
+        } catch {
             toast.error('Gagal memuat stok');
         } finally {
             setLoading(false);
@@ -90,6 +106,10 @@ export default function StockOpnamePage() {
 
     const handleSubmit = async () => {
         if (!selectedWarehouse) return;
+        if (!selectedAccount) {
+            toast.error('Pilih Akun Penyesuaian terlebih dahulu');
+            return;
+        }
         setSubmitting(true);
 
         try {
@@ -104,7 +124,6 @@ export default function StockOpnamePage() {
                 return {
                     produkId: stock.persediaan.produk.id,
                     kuantitas: diff, // + or -
-                    // hargaSatuan: optional if we want to override cost
                 };
             }).filter(Boolean);
 
@@ -118,13 +137,14 @@ export default function StockOpnamePage() {
             await api.post('/inventory/movement', {
                 items: itemsToAdjust,
                 gudangId: selectedWarehouse,
+                akunId: selectedAccount,
                 tipe: 'ADJUSTMENT',
                 tanggal: new Date().toISOString(),
                 keterangan: 'Stock Opname Adjustment',
                 referensi: `SO-${new Date().toISOString().slice(0, 10)}`
             });
 
-            toast.success('Stok berhasil disesuaikan');
+            toast.success('Stok dan jurnal berhasil disesuaikan');
             fetchStock(selectedWarehouse); // Refresh
 
         } catch (error) {
@@ -143,7 +163,7 @@ export default function StockOpnamePage() {
             <h1 className="text-2xl font-bold tracking-tight">Stock Opname</h1>
 
             <Card className="p-4">
-                <div className="flex gap-4 items-end">
+                <div className="flex gap-4 items-end flex-wrap">
                     <div className="space-y-2 w-[300px]">
                         <label className="text-sm font-medium">Pilih Gudang</label>
                         <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
@@ -157,6 +177,21 @@ export default function StockOpnamePage() {
                             </SelectContent>
                         </Select>
                     </div>
+
+                    <div className="space-y-2 w-[300px]">
+                        <label className="text-sm font-medium">Akun Penyesuaian</label>
+                        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Pilih Akun Penyesuaian..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {accounts.map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>{acc.kodeAkun} - {acc.namaAkun}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <Button
                         variant="outline"
                         onClick={() => selectedWarehouse && fetchStock(selectedWarehouse)}
@@ -222,12 +257,12 @@ export default function StockOpnamePage() {
                             type="button"
                             onClick={handleSubmit}
                             disabled={submitting || stocks.length === 0}
-                            className="w-[150px]"
+                            className="w-[200px]"
                         >
                             {submitting ? 'Menyimpan...' : (
                                 <>
                                     <Save className="mr-2 h-4 w-4" />
-                                    Simpan Opname
+                                    Simpan Opname & Jurnal
                                 </>
                             )}
                         </Button>

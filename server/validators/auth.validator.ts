@@ -15,6 +15,8 @@ export const registerSchema = z.object({
     role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
     namaPerusahaan: z.string().min(2, 'Nama perusahaan harus minimal 2 karakter').optional(),
     paket: z.enum(['UMKM', 'SMALL', 'MEDIUM', 'ENTERPRISE']).optional().default('UMKM'),
+    tahunBuku: z.number().int().optional(),
+    bulanMulaiFiskal: z.number().int().min(1).max(12).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Konfirmasi password tidak cocok",
     path: ["confirmPassword"],

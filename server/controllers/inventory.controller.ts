@@ -38,12 +38,8 @@ export const getStock = async (req: Request, res: Response) => {
         });
 
         // 2. Map to ProductStock format expected by frontend
-        // If stock record missing for this warehouse, create a virtual one with 0 qty
-        const formattedStocks = items.map(item => {
-            const stockRecord = item.stok[0]; // Since we filter by specific warehouseId in include, this should be the one (or undefined)
-
-            // If we are searching for a specific warehouse, we return 1 entry per product
-            // If warehouseId is NOT provided, this logic would return only the first stock found (which might not be what we want for "Global" view, but for now this fixes the Opname Page which ALWAYS sends warehouseId)
+        const formattedStocks = items.map((item: any) => {
+            const stockRecord = item.stok[0];
 
             return {
                 id: stockRecord?.id || `virtual-${item.id}`,
@@ -132,21 +128,33 @@ export const createWarehouse = async (req: Request, res: Response) => {
 
 export const recordMovement = async (req: Request, res: Response) => {
     try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId;
+        const user = authReq.user;
+
+        if (!perusahaanId || !user) {
+            return res.status(401).json({ message: 'Akses tidak valid atau sesi berakhir' });
+        }
+
         const validatedData = stockMovementSchema.parse(req.body);
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const results = [];
 
             // 1. PRE-FETCH ALL PRODUCTS
-            const productIds = validatedData.items.map(i => i.produkId);
+            const productIds = validatedData.items.map((i: any) => i.produkId);
             const products = await tx.produk.findMany({
                 where: { id: { in: productIds } },
                 include: { persediaan: true }
             });
-            const productMap = new Map(products.map(p => [p.id, p]));
+            const productMap = new Map<string, (typeof products)[0]>(
+                products.map((p: any) => [p.id, p])
+            );
 
             // 2. PRE-FETCH ALL RELEVANT STOCK
-            const persediaanIds = products.filter(p => !!p.persediaanId).map(p => p.persediaanId!);
+            const persediaanIds = products
+                .filter((p: any) => !!p.persediaanId)
+                .map((p: any) => p.persediaanId!);
             const warehouseIds = [validatedData.gudangId];
             if (validatedData.tipe === 'TRANSFER') {
                 warehouseIds.push(validatedData.gudangTujuanId!);
@@ -159,7 +167,9 @@ export const recordMovement = async (req: Request, res: Response) => {
                 }
             });
 
-            const stockMap = new Map(currentStocks.map(s => [`${s.persediaanId}_${s.gudangId}`, Number(s.kuantitas)]));
+            const stockMap = new Map<string, number>(
+                currentStocks.map((s: any) => [`${s.persediaanId}_${s.gudangId}`, Number(s.kuantitas)])
+            );
 
             // 3. PREPARE BATCH ITEMS FOR SERVICE
             const timestamp = Date.now();
@@ -174,6 +184,9 @@ export const recordMovement = async (req: Request, res: Response) => {
                 const costPrice = product.persediaan ? Number(product.persediaan.hargaBeli) : 0;
                 const absQty = Math.abs(item.kuantitas);
 
+                // 4. ACCOUNTING SYNC
+                const journalEntries: { akunId: string, deskripsi: string, debit: number, kredit: number }[] = [];
+
                 if (validatedData.tipe === 'TRANSFER') {
                     const targetGudangId = validatedData.gudangTujuanId!;
 
@@ -184,7 +197,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                     }
 
                     // TRANSFER OUT
-                    const totalCostTransfer = await InventoryService.removeStock(tx as unknown as Prisma.TransactionClient, {
+                    const totalCostTransfer = await InventoryService.removeStock(tx, {
                         persediaanId,
                         gudangId: validatedData.gudangId,
                         qty: absQty,
@@ -197,7 +210,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                     const realUnitCost = totalCostTransfer / absQty;
 
                     // TRANSFER IN
-                    await InventoryService.addStock(tx as unknown as Prisma.TransactionClient, {
+                    await InventoryService.addStock(tx, {
                         persediaanId,
                         gudangId: targetGudangId,
                         qty: absQty,
@@ -222,7 +235,7 @@ export const recordMovement = async (req: Request, res: Response) => {
                             throw new Error(`Stok tidak mencukupi untuk produk ${product.namaProduk}. Stok saat ini: ${currentQty}, Dibutuhkan: ${absQty}`);
                         }
 
-                        await InventoryService.removeStock(tx as unknown as Prisma.TransactionClient, {
+                        const totalCostValue = await InventoryService.removeStock(tx, {
                             persediaanId,
                             gudangId: validatedData.gudangId,
                             qty: absQty,
@@ -231,21 +244,103 @@ export const recordMovement = async (req: Request, res: Response) => {
                             tanggal: new Date(validatedData.tanggal),
                             keterangan: validatedData.keterangan || 'Pengurangan Stok'
                         });
+
+                        // Create Journal Entry for Reduction
+                        if (product.persediaan?.akunPersediaanId && validatedData.akunId) {
+                            journalEntries.push({
+                                akunId: product.persediaan.akunPersediaanId,
+                                deskripsi: `Pengurangan Stok: ${product.namaProduk} (${absQty} ${product.satuan})`,
+                                debit: 0,
+                                kredit: totalCostValue
+                            });
+                            journalEntries.push({
+                                akunId: validatedData.akunId,
+                                deskripsi: `Penyesuaian/Pengeluaran: ${product.namaProduk}`,
+                                debit: totalCostValue,
+                                kredit: 0
+                            });
+                        }
                     } else {
-                        await InventoryService.addStock(tx as unknown as Prisma.TransactionClient, {
+                        // INCREMENT (MASUK or ADJUSTMENT positive)
+                        // For manual entry, we use costPrice from product record as default if none provided in item
+                        const customCost = item.hargaSatuan || costPrice;
+                        const totalCostValue = absQty * customCost;
+
+                        await InventoryService.addStock(tx, {
                             persediaanId,
                             gudangId: validatedData.gudangId,
                             qty: absQty,
-                            costPerUnit: costPrice,
+                            costPerUnit: customCost,
                             refType: validatedData.tipe === 'ADJUSTMENT' ? 'ADJUSTMENT' : 'MASUK',
                             refId: `MUT-${timestamp}-IN`,
                             tanggal: new Date(validatedData.tanggal),
                             keterangan: validatedData.keterangan || 'Penambahan Stok'
                         });
+
+                        // Create Journal Entry for Addition
+                        if (product.persediaan?.akunPersediaanId && validatedData.akunId) {
+                            journalEntries.push({
+                                akunId: product.persediaan.akunPersediaanId,
+                                deskripsi: `Penambahan Stok: ${product.namaProduk} (${absQty} ${product.satuan})`,
+                                debit: totalCostValue,
+                                kredit: 0
+                            });
+                            journalEntries.push({
+                                akunId: validatedData.akunId,
+                                deskripsi: `Penyesuaian/Pemasukan: ${product.namaProduk}`,
+                                debit: 0,
+                                kredit: totalCostValue
+                            });
+                        }
                     }
                 }
 
-                results.push({ produk: product.namaProduk, status: 'OK' });
+                // If we have journal entries, create a Voucher for this movement
+                if (journalEntries.length > 0) {
+                    const voucher = await tx.voucher.create({
+                        data: {
+                            perusahaanId: perusahaanId,
+                            nomorVoucher: `VCH-STK-${timestamp}`,
+                            tanggal: new Date(validatedData.tanggal),
+                            tipe: 'JURNAL_UMUM',
+                            deskripsi: validatedData.keterangan || `Penyesuaian Stok - ${validatedData.tipe}`,
+                            totalDebit: journalEntries.reduce((sum, e) => sum + e.debit, 0),
+                            totalKredit: journalEntries.reduce((sum, e) => sum + e.kredit, 0),
+                            status: 'DIPOSTING',
+                            dibuatOlehId: user.id,
+                            isPosted: true,
+                            postedAt: new Date(),
+                            postedBy: user.username,
+                            detail: {
+                                create: journalEntries.map((e, idx) => ({
+                                    urutan: idx + 1,
+                                    akunId: e.akunId,
+                                    deskripsi: e.deskripsi,
+                                    debit: e.debit,
+                                    kredit: e.kredit
+                                }))
+                            }
+                        }
+                    });
+
+                    // 6. CREATE TransaksiPersediaan (Semantic Link)
+                    await tx.transaksiPersediaan.create({
+                        data: {
+                            produkId: item.produkId,
+                            voucherId: voucher.id,
+                            tipe: validatedData.tipe,
+                            tanggal: new Date(validatedData.tanggal),
+                            kuantitas: absQty,
+                            hargaSatuan: journalEntries.find(e => e.debit > 0 || e.kredit > 0)?.debit || 0, // Simplified
+                            total: journalEntries.find(e => e.debit > 0 || e.kredit > 0)?.debit || journalEntries.find(e => e.kredit > 0)?.kredit || 0,
+                            keterangan: validatedData.keterangan || `Transaksi Persediaan (${validatedData.tipe})`
+                        }
+                    });
+
+                    results.push({ produk: product.namaProduk, status: 'OK', voucherId: voucher.id });
+                } else {
+                    results.push({ produk: product.namaProduk, status: 'OK' });
+                }
             }
 
             return results;

@@ -5,16 +5,24 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useCompany } from '@/hooks/use-company';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, DollarSign, Activity, Loader2, Plus, ArrowRightLeft } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Loader2, Plus, ArrowRightLeft, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DashboardCharts } from '@/components/dashboard/dashboard-charts';
 import { HelpIndicator } from '@/components/ui/help-indicator';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 export default function DashboardPage() {
     const { user, loading: authLoading } = useRequireAuth();
-    const { currentCompany: company, loading: companyLoading } = useCompany();
-    const { data: stats, isLoading: statsLoading } = useDashboard();
+    const { currentCompany: company, loading: companyLoading, currentBranch, switchBranch, useBranches } = useCompany();
+    const { data: stats, isLoading: statsLoading } = useDashboard(currentBranch?.id);
+    const { data: branches } = useBranches();
 
     if (authLoading || statsLoading || companyLoading) return (
         <div className="flex items-center justify-center min-h-screen">
@@ -31,8 +39,28 @@ export default function DashboardPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
                     <p className="text-slate-500 mt-1">
-                        Ringkasan keuangan {company?.nama} per {format(new Date(), 'dd MMMM yyyy', { locale: id })}
+                        Ringkasan keuangan {company?.nama} {currentBranch ? `(Cabang: ${currentBranch.nama})` : '(Konsolidasi)'} per {format(new Date(), 'dd MMMM yyyy', { locale: id })}
                     </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <Select
+                        value={currentBranch?.id || 'ALL'}
+                        onValueChange={(val) => switchBranch(val)}
+                    >
+                        <SelectTrigger className="w-[200px] bg-white border-slate-200">
+                            <Building2 className="mr-2 h-4 w-4 text-slate-400" />
+                            <SelectValue placeholder="Pilih Cabang" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">Semua Cabang (Konsolidasi)</SelectItem>
+                            {branches?.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                    {b.nama}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 

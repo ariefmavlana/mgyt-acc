@@ -13,11 +13,18 @@ export const getCompanies = async (req: Request, res: Response) => {
         const limit = parseInt((req.query.limit as string) || '10');
         const skip = (page - 1) * limit;
 
-        const [companies, total] = await Promise.all([
+        const [companiesRes, total] = await Promise.all([
             prisma.perusahaan.findMany({
                 where: {
                     aksesPengguna: {
                         some: { penggunaId: userId }
+                    }
+                },
+                include: {
+                    perusahaanPakets: {
+                        where: { isAktif: true },
+                        include: { paket: true },
+                        take: 1
                     }
                 },
                 skip,
@@ -32,6 +39,11 @@ export const getCompanies = async (req: Request, res: Response) => {
                 }
             })
         ]);
+
+        const companies = companiesRes.map(c => ({
+            ...c,
+            tier: c.perusahaanPakets[0]?.paket?.tier || 'UMKM'
+        }));
 
         res.json({
             companies,
@@ -268,6 +280,64 @@ export const getBranches = async (req: Request, res: Response) => {
     } catch (error: unknown) {
         console.error('Get Branches Error:', error);
         res.status(500).json({ message: 'Gagal mengambil daftar cabang' });
+    }
+};
+
+export const createBranch = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId;
+        const data = req.body;
+
+        if (!perusahaanId) return res.status(400).json({ message: 'Perusahaan tidak ditemukan' });
+
+        const branch = await prisma.cabang.create({
+            data: {
+                ...data,
+                perusahaanId
+            }
+        });
+
+        res.status(201).json(branch);
+    } catch (error) {
+        console.error('Create Branch Error:', error);
+        res.status(500).json({ message: 'Gagal membuat cabang' });
+    }
+};
+
+export const updateBranch = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId;
+        const { branchId } = req.params;
+        const data = req.body;
+
+        const branch = await prisma.cabang.update({
+            where: { id: branchId, perusahaanId },
+            data
+        });
+
+        res.json(branch);
+    } catch (error) {
+        console.error('Update Branch Error:', error);
+        res.status(500).json({ message: 'Gagal memperbarui cabang' });
+    }
+};
+
+export const deleteBranch = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId;
+        const { branchId } = req.params;
+
+        await prisma.cabang.delete({
+            where: { id: branchId, perusahaanId }
+        });
+
+        res.json({ message: 'Cabang berhasil dihapus' });
+    } catch (error) {
+        console.error('Delete Branch Error:', error);
+        res.status(500).json({ message: 'Gagal menghapus cabang' });
     }
 };
 

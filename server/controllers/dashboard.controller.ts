@@ -8,9 +8,19 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
         const perusahaanId = authReq.currentCompanyId;
+        const { cabangId } = req.query;
 
         if (!perusahaanId) {
             return res.status(400).json({ message: 'Context perusahaan tidak ditemukan' });
+        }
+
+        // Create explicit where for journals
+        const journalWhere: any = {
+            perusahaanId,
+            isPosted: true
+        };
+        if (cabangId) {
+            journalWhere.cabangId = cabangId as string;
         }
 
         // 1. Calculate Revenue (PENDAPATAN) - Normal Balance: CREDIT
@@ -20,10 +30,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                 debit: true
             },
             where: {
-                jurnal: {
-                    perusahaanId,
-                    isPosted: true
-                },
+                jurnal: journalWhere,
                 akun: {
                     tipe: {
                         in: [TipeAkun.PENDAPATAN, TipeAkun.PENDAPATAN_KOMPREHENSIF_LAIN]
@@ -40,10 +47,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                 kredit: true
             },
             where: {
-                jurnal: {
-                    perusahaanId,
-                    isPosted: true
-                },
+                jurnal: journalWhere,
                 akun: {
                     tipe: TipeAkun.BEBAN
                 }
@@ -58,6 +62,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         const pendingApprovals = await prisma.voucher.count({
             where: {
                 perusahaanId,
+                cabangId: (cabangId as string) || undefined,
                 status: 'MENUNGGU_PERSETUJUAN'
             }
         });
@@ -94,10 +99,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                 kredit: true
             },
             where: {
-                jurnal: {
-                    perusahaanId,
-                    isPosted: true
-                },
+                jurnal: journalWhere,
                 akun: {
                     kategoriAset: KategoriAset.KAS_DAN_SETARA_KAS
                 }

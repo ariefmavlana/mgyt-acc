@@ -12,6 +12,7 @@ export const createInvoiceSchema = z.object({
     catatan: z.string().optional(),
     mataUangId: z.string().optional(), // Defaults to IDR
     kurs: z.number().optional(), // Defaults to 1
+    cabangId: z.string().optional(),
 
     // Line items
     items: z.array(transactionLineSchema.omit({ kredit: true, debit: true }).extend({

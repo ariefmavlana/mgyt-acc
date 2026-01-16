@@ -17,6 +17,7 @@ export const createCompanySchema = z.object({
     npwp: z.string().optional(),
     mataUangUtama: z.string().default('IDR'),
     tahunBuku: z.number().default(12),
+    bulanMulaiFiskal: z.number().min(1).max(12).default(1),
 });
 
 export const updateCompanySchema = createCompanySchema.partial();
@@ -24,6 +25,7 @@ export const updateCompanySchema = createCompanySchema.partial();
 export const settingsSchema = z.object({
     mataUangUtama: z.string().optional(),
     tahunBuku: z.number().optional(),
+    bulanMulaiFiskal: z.number().min(1).max(12).optional(),
     alamat: z.string().optional(),
     telepon: z.string().optional(),
 });

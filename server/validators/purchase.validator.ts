@@ -10,6 +10,7 @@ export const createPurchaseSchema = z.object({
     referensi: z.string().optional(),
     gudangId: z.string().optional(),
     catatan: z.string().optional(),
+    cabangId: z.string().optional(),
     mataUangId: z.string().optional(),
     kurs: z.number().optional(),
 

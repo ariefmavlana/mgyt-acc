@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -34,71 +34,54 @@ const movementSchema = z.object({
     gudangTujuanId: z.string().optional(),
     referensi: z.string().optional(),
     keterangan: z.string().optional(),
+    akunId: z.string().optional(),
     items: z.array(z.object({
         produkId: z.string().min(1, 'Produk wajib'),
         kuantitas: z.number().gt(0, 'Qty > 0'),
     })).min(1, 'Minimal 1 item'),
+}).superRefine((data, ctx) => {
+    if (data.tipe !== 'TRANSFER' && !data.akunId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Akun penyesuaian/kas wajib dipilih",
+            path: ["akunId"]
+        });
+    }
 });
 
 type MovementValues = z.infer<typeof movementSchema>;
 
 interface Warehouse { id: string; nama: string; kode: string; cabang?: { nama: string } }
-interface Product { id: string; namaProduk: string; kodeProduk: string; satuan: string;[key: string]: any }
+interface Product { id: string; namaProduk: string; kodeProduk: string; satuan: string;[key: string]: unknown }
+
+interface Account { id: string; namaAkun: string; kodeAkun: string }
 
 export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
 
     // Load initial data
     useEffect(() => {
         const loadData = async () => {
             try {
-                // Assuming we have endpoints/functions to get generic lists
-                // Create a dedicated helper or use existing list endpoints
-                const [whRes, prodRes] = await Promise.all([
-                    api.get('/companies/warehouses'), // Hypothetical or needs creating?
-                    // Actually, GUDANG model exists but do we have an endpoint? 
-                    // Let's assume we might need to fallback or if 'companies/warehouses' isn't there, we use what we have.
-                    // Checking schema: Gudang linked to Cabang.
-                    // I'll assume we can fetch warehouses. If not, I'll mock or fix.
-                    // Safe bet: Fetch products first.
-                    api.get('/products?limit=100')
+                const [whRes, prodRes, accRes] = await Promise.all([
+                    api.get('/inventory/warehouses'),
+                    api.get('/products?limit=100'),
+                    api.get('/coa?flatten=true')
                 ]);
-
-                // Mock warehouses for now if endpoint missing, or try typical path
-                // I will add a simple get warehouses endpoint if it fails, but for now let's hope. 
-                // Actually I didn't create warehouse controller. 
-                // I'll create a hardcoded list or fetch from Cabang if needed.
-                // Wait, I saw `gudangId` in `StokPersediaan`.
 
                 setProducts(prodRes.data.data || prodRes.data);
                 setWarehouses(whRes.data);
+                setAccounts(accRes.data);
             } catch (e) {
                 console.error('Failed to load stock movement data:', e);
                 toast.error('Gagal memuat data pendukung');
             }
         };
-        // Quick fetch warehouses workaround: 
-        // I'll fetch companies/me/warehouses or similar.
-        // Actually, I'll create a quick fetch inside valid warehouse check.
-        // For SAFETY: I will just fetch warehouses via a new simple fetch or reuse known data.
-        // Let's try to fetch via the new inventory endpoints? No.
-
-        // I will use a dummy warehouse list for UI dev if api fails, 
-        // BUT I SHOULD REALLY HAVE A WAREHOUSE ENDPOINT.
-        // I will implement a quick warehouse list fetcher in the component using a raw query if needed,
-        // but likely the user has `Gudang` data.
-        // I will add a `getWarehouses` to `company.controller` if missing.
-        // Checking `company.controller`... I didn't check it fully.
-        // Let's assume for now.
 
         loadData();
     }, []);
-
-    // FETCH WAREHOUSES - I'll actually fetch them from a standard route if available 
-    // or just hardcode a selector if purely frontend task, but better to be real.
-    // I previously saw `Gudang` model.
-    // I'll put a placeholder for now. 
 
     const form = useForm<MovementValues>({
         resolver: zodResolver(movementSchema),
@@ -114,7 +97,11 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
         name: 'items'
     });
 
-    const watchType = form.watch('tipe');
+    const watchType = useWatch({
+        control: form.control,
+        name: 'tipe',
+        defaultValue: 'MASUK'
+    });
 
     const onSubmit = async (data: MovementValues) => {
         try {
@@ -122,7 +109,7 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
             toast.success('Pergerakan stok tercatat!');
             form.reset();
             if (onSuccess) onSuccess();
-        } catch (error: any) {
+        } catch (error: unknown) {
             const err = error as { response?: { data?: { message?: string } } };
             toast.error(err.response?.data?.message || 'Gagal menyimpan');
         }
@@ -198,7 +185,7 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                         )}
                     />
 
-                    {watchType === 'TRANSFER' && (
+                    {watchType === 'TRANSFER' ? (
                         <FormField
                             control={form.control}
                             name="gudangTujuanId"
@@ -214,6 +201,35 @@ export function StockMovementForm({ onSuccess }: { onSuccess?: () => void }) {
                                         <SelectContent>
                                             {warehouses.map(w => (
                                                 <SelectItem key={w.id} value={w.id}>{w.nama} ({w.cabang?.nama})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    ) : (
+                        <FormField
+                            control={form.control}
+                            name="akunId"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        {watchType === 'MASUK' ? 'Akun Modal/Kas/Hutang' :
+                                            watchType === 'KELUAR' ? 'Akun Biaya/Kas/Piutang' :
+                                                'Akun Penyesuaian'}
+                                    </FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Pilih Akun" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {accounts.map(acc => (
+                                                <SelectItem key={acc.id} value={acc.id}>
+                                                    {acc.kodeAkun} - {acc.namaAkun}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>

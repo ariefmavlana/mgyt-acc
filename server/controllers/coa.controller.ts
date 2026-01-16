@@ -98,6 +98,53 @@ export const getCOADetail = async (req: Request, res: Response) => {
     }
 };
 
+export const getNextAccountCode = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { parentId } = req.query;
+
+        if (!parentId) {
+            return res.status(400).json({ message: 'Parent ID is required' });
+        }
+
+        const parent = await prisma.chartOfAccounts.findUnique({
+            where: { id: parentId as string }
+        });
+
+        if (!parent) {
+            return res.status(404).json({ message: 'Parent account not found' });
+        }
+
+        // Find sibling with highest code
+        const lastSibling = await prisma.chartOfAccounts.findFirst({
+            where: { perusahaanId, parentId: parentId as string },
+            orderBy: { kodeAkun: 'desc' }
+        });
+
+        let nextCode = "";
+        if (lastSibling) {
+            // Increment last digit or part of the code
+            const parts = lastSibling.kodeAkun.split(/[-.]/);
+            const lastPart = parts[parts.length - 1];
+            if (!isNaN(Number(lastPart))) {
+                const newLastPart = String(Number(lastPart) + 1).padStart(lastPart.length, '0');
+                parts[parts.length - 1] = newLastPart;
+                nextCode = parts.join(lastSibling.kodeAkun.includes('-') ? '-' : '.');
+            } else {
+                nextCode = `${lastSibling.kodeAkun}-01`;
+            }
+        } else {
+            // First child - start with parent code + suffix
+            nextCode = `${parent.kodeAkun}-01`;
+        }
+
+        res.json({ nextCode });
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal mendapatkan saran nomor akun' });
+    }
+};
+
 export const createCOA = async (req: Request, res: Response) => {
     try {
         const authReq = req as AuthRequest;
@@ -514,5 +561,47 @@ export const importCOA = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Import COA Error:', error);
         res.status(500).json({ message: 'Gagal mengimport data akun' });
+    }
+};
+
+export const updateOpeningBalances = async (req: Request, res: Response) => {
+    try {
+        const authReq = req as AuthRequest;
+        const perusahaanId = authReq.currentCompanyId!;
+        const { balances } = req.body; // Array of { id, saldoAwal }
+
+        if (!Array.isArray(balances)) {
+            return res.status(400).json({ message: 'Balances array is required' });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            for (const item of balances) {
+                const account = await tx.chartOfAccounts.findUnique({
+                    where: { id: item.id, perusahaanId }
+                });
+
+                if (account) {
+                    // Calculate adjustment to saldoBerjalan
+                    const oldSaldoAwal = Number(account.saldoAwal);
+                    const newSaldoAwal = Number(item.saldoAwal);
+                    const adjustment = newSaldoAwal - oldSaldoAwal;
+
+                    await tx.chartOfAccounts.update({
+                        where: { id: item.id },
+                        data: {
+                            saldoAwal: newSaldoAwal,
+                            saldoBerjalan: {
+                                increment: adjustment
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
+        res.json({ message: 'Saldo awal berhasil diperbarui' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Gagal memperbarui saldo awal' });
     }
 };

@@ -53,7 +53,7 @@ model Karyawan {
 
 model Penggajian {
     id           String     @id @default(cuid())
-    perusahaan   Perusahaan @relation(fields: [perusahaanId], references: [id])
+    perusahaan   Perusahaan @relation("PerusahaanPayrolls", fields: [perusahaanId], references: [id])
     perusahaanId String
     karyawan     Karyawan   @relation(fields: [karyawanId], references: [id])
     karyawanId   String
