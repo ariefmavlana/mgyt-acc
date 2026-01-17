@@ -1,5 +1,4 @@
 "use client";
-
 import Image from "next/image";
 
 export const LoginHero = () => {
@@ -14,9 +13,9 @@ export const LoginHero = () => {
       {/* Hero Image */}
       <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-soft-lg">
         <img
-          src="/assets/done.png"
+          src="/assets/login-hero.png"
           alt="Accounting Dashboard Preview"
-          className="w-full h-full object-cover"
+          className="object-cover"
         />
       </div>
     </div>

@@ -1,165 +1,62 @@
 @import "tailwindcss";
 
-@layer theme {
-  :root {
-    /* Background & Foreground - High Contrast */
-    --color-background: oklch(100% 0 0);
-    --color-foreground: oklch(25% 0.02 250);
-
-    /* Card */
-    --color-card: oklch(100% 0 0);
-    --color-card-foreground: oklch(25% 0.02 250);
-
-    /* Popover */
-    --color-popover: oklch(100% 0 0);
-    --color-popover-foreground: oklch(25% 0.02 250);
-
-    /* Primary - Blue with high contrast */
-    --color-primary: oklch(65% 0.2 250);
-    --color-primary-foreground: oklch(100% 0 0);
-
-    /* Secondary - Higher contrast gray */
-    --color-secondary: oklch(88% 0.01 250);
-    --color-secondary-foreground: oklch(25% 0.02 250);
-
-    /* Muted - Better contrast */
-    --color-muted: oklch(96% 0.005 250);
-    --color-muted-foreground: oklch(45% 0.01 250);
-
-    /* Accent - Higher contrast */
-    --color-accent: oklch(95% 0.005 250);
-    --color-accent-foreground: oklch(25% 0.02 250);
-
-    /* Destructive */
-    --color-destructive: oklch(60% 0.22 25);
-    --color-destructive-foreground: oklch(100% 0 0);
-
-    /* Border & Input - More visible */
-    --color-border: oklch(92% 0.005 250);
-    --color-input: oklch(92% 0.005 250);
-    --color-ring: oklch(65% 0.2 250);
-
-    /* Radius */
-    --radius: 0.5rem;
-    --radius-sm: calc(var(--radius) - 0.25rem);
-    --radius-md: calc(var(--radius) - 0.125rem);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 0.25rem);
-    --radius-2xl: calc(var(--radius) + 0.5rem);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-background: oklch(25% 0.02 250);
-      --color-foreground: oklch(98% 0.005 250);
-
-      --color-card: oklch(30% 0.015 250);
-      --color-card-foreground: oklch(98% 0.005 250);
-
-      --color-popover: oklch(30% 0.015 250);
-      --color-popover-foreground: oklch(98% 0.005 250);
-
-      --color-primary: oklch(65% 0.2 250);
-      --color-primary-foreground: oklch(100% 0 0);
-
-      --color-secondary: oklch(35% 0.015 250);
-      --color-secondary-foreground: oklch(98% 0.005 250);
-
-      --color-muted: oklch(32% 0.015 250);
-      --color-muted-foreground: oklch(75% 0.01 250);
-
-      --color-accent: oklch(35% 0.015 250);
-      --color-accent-foreground: oklch(98% 0.005 250);
-
-      --color-destructive: oklch(45% 0.18 25);
-      --color-destructive-foreground: oklch(98% 0.005 250);
-
-      --color-border: oklch(35% 0.015 250);
-      --color-input: oklch(35% 0.015 250);
-      --color-ring: oklch(65% 0.2 250);
-    }
-  }
-}
-
-@layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
-  body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-    font-feature-settings: "rlig" 1, "calt" 1;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    color: var(--color-foreground);
-  }
-
-  /* Button and interactive elements high contrast */
-  button:hover,
-  a:hover {
-    transition-property: color, background-color, border-color;
-    transition-duration: 200ms;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* Focus states with high contrast ring */
-  *:focus-visible {
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
-  }
+@theme {
+  /* Use Next.js font variable */
+  --font-family-sans: var(--font-ubuntu), ui-sans-serif, system-ui, sans-serif;
+  --font-family-ubuntu: var(--font-ubuntu), sans-serif;
 }
 
 @layer utilities {
-  /* Soft shadows */
-  .shadow-soft {
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 1px 3px 0 rgb(0 0 0 / 0.02);
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
-  .shadow-soft-md {
-    box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.04),
-      0 4px 6px -1px rgb(0 0 0 / 0.06);
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
+}
 
-  .shadow-soft-lg {
-    box-shadow: 0 4px 6px -2px rgb(0 0 0 / 0.05),
-      0 10px 15px -3px rgb(0 0 0 / 0.08);
-  }
+:root {
+  color-scheme: light dark;
+}
 
-  .shadow-soft-xl {
-    box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.08),
-      0 10px 10px -5px rgb(0 0 0 / 0.04);
-  }
+* {
+  box-sizing: border-box;
+}
 
-  /* High contrast hover states */
-  .hover-contrast:hover {
-    background-color: oklch(95% 0.005 250);
-    color: oklch(15% 0.02 250);
-  }
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
 
-  /* Active state with strong contrast */
-  .active-contrast {
-    background-color: var(--color-primary);
-    color: var(--color-primary-foreground);
-    font-weight: 500;
-  }
+body {
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  /* Focus state utilities */
-  .focus-contrast:focus {
-    background-color: oklch(95% 0.005 250);
-    color: oklch(15% 0.02 250);
-    box-shadow: 0 0 0 2px var(--color-background),
-      0 0 0 4px var(--color-primary);
-  }
+/* Custom Scrollbar - Hidden but still scrollable */
+::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+/* Custom Scrollbar - Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* For IE and Edge Legacy */
+body {
+  -ms-overflow-style: none;
 }

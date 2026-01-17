@@ -103,14 +103,6 @@ export const LoginCard = () => {
 
   return (
     <div className="w-full max-w-md">
-      {/* Mobile Logo */}
-      <div className="lg:hidden flex items-center justify-center space-x-2 mb-8">
-        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-          <BarChart3 className="w-6 h-6 text-neutral-900" />
-        </div>
-        <span className="text-2xl font-bold text-foreground">MGYT ACC</span>
-      </div>
-
       <Card className="border-none shadow-none">
         <CardHeader className="space-y-1">
           <CardTitle className="text-xl font-bold">

@@ -6,8 +6,8 @@ import { LoginCard } from "./login-card";
 
 export const LoginForm = () => {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 lg:p-12 bg-neutral-100">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-soft-xl overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 lg:p-12 bg-orange-50">
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex flex-col lg:flex-row p-6">
           {/* Left Side - Hero Section */}
           <LoginHero />

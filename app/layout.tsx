@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Ubuntu } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const ubuntu = Ubuntu({
+  weight: ["300", "400", "500", "700"],
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-ubuntu",
 });
 
 export const metadata: Metadata = {
@@ -18,9 +15,9 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "@/hooks/use-auth";
-import { CompanyProvider } from '@/hooks/use-company';
-import { Toaster } from '@/components/ui/sonner';
-import QueryProvider from '@/components/providers/query-provider';
+import { CompanyProvider } from "@/hooks/use-company";
+import { Toaster } from "@/components/ui/sonner";
+import QueryProvider from "@/components/providers/query-provider";
 
 export default function RootLayout({
   children,
@@ -28,10 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="id" className={ubuntu.variable} suppressHydrationWarning>
+      <body className={`${ubuntu.className} antialiased`}>
         <QueryProvider>
           <AuthProvider>
             <CompanyProvider>
